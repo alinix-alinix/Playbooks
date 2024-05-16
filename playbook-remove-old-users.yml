@@ -1,4 +1,4 @@
-- name: Removing users, listed in infra/group_vars/all/fired_workers.yml. Also cleaning out root account from their keys
+- name: Removing users, listed in group_vars/all/fired_workers.yml. Also cleaning out root account from their keys
   gather_facts: true
   hosts: all
   become: true
