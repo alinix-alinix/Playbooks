@@ -11,7 +11,7 @@
       set_fact:
         host_users: "{{ getent_passwd|dict2items|selectattr('value', 'contains', '/bin/bash')|map(attribute='key') }}"
 
-    - name: removing host users, listed in infra/group_vars/all/fired_workers.yml
+    - name: removing host users, listed in group_vars/all/fired_workers.yml
       user:
         name: "{{ item.username }}"
         state: absent
