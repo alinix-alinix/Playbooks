@@ -1,12 +1,12 @@
 ---
 list_of_fired_workers:
-  - username: user1
+  - username: "user1"
     known_keys:
       - "ssh-rsa user1key1"
       - "ssh-rsa user1key2"
-  - username: user2
+  - username: "user2"
     known_keys:
       - "ssh-rsa user2key1"
-  - username: user3
+  - username: "user3"
     known_keys:
       - "none"
