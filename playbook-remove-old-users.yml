@@ -1,0 +1,34 @@
+- name: Removing users, listed in infra/group_vars/all/fired_workers.yml. Also cleaning out root account from their keys
+  gather_facts: true
+  hosts: all
+  become: true
+  tasks:
+    - name: get current host users {{ inventory_hostname }}
+      getent:
+        database: passwd
+
+    - name: making list of host users who can actually login
+      set_fact:
+        host_users: "{{ getent_passwd|dict2items|selectattr('value', 'contains', '/bin/bash')|map(attribute='key') }}"
+
+    - name: removing host users, listed in infra/group_vars/all/fired_workers.yml
+      user:
+        name: "{{ item.username }}"
+        state: absent
+        remove: false
+      when: item.username in host_users
+      loop: "{{ list_of_fired_workers }}"
+
+    - name: making list of all known_keys
+      set_fact:
+        key_list: "{{key_list|default([]) + [item.1]}}"
+      loop: "{{  list_of_fired_workers|subelements('known_keys') }}"        
+   
+    - name: and cleaning /root/.ssh/authorized_keys with collected data
+      authorized_key:
+        user: "root"
+        state: absent
+        key: "{{ item }}"
+      when: item != "none"
+      loop: "{{ key_list }}"
+  strategy: free
