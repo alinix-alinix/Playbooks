@@ -1,0 +1,25 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+[Unit]
+Description=memcached daemon
+After=network.target
+Documentation=man:memcached(1)
+
+[Service]
+User={{ memcached_user }}
+ExecStart=/usr/bin/memcached \
+  -l {{ memcached_listen_address }} \
+  -p {{ memcached_listen_port }} \
+  -m {{ memcached_cache_size }} \
+  -c {{ memcached_connections_limit }} \
+  -I {{ memcached_max_item_size }} \
+  logfile {{ memcache_logfile }}
+
+PIDFile=/run/memcached/memcached.pid
+Restart={{ memcached_restart_mode }}
+RestartSec={{ memcached_restart_timeout }}
+
+[Install]
+WantedBy=multi-user.target
