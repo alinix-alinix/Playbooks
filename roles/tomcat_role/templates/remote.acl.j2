@@ -1,0 +1,9 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+{% if tomcat_jmx_user | length > 0 %}
+{{ tomcat_jmx_user }} readwrite \
+create com.sun.management.*, com.oracle.jrockit.* \
+unregister
+{% endif %}
