@@ -1,0 +1,15 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+[Unit]
+Description=Start haproxy-exporter
+
+[Service]
+Type=simple
+ExecStart={{ haproxy_exporter_bin_folder }}/haproxy_exporter --haproxy.scrape-uri=http://{{ haproxy_stats_user }}:{{ haproxy_stats_password }}@{{ ansible_ssh_host }}:1936/stats;csv
+Restart=always
+RestartSec=30
+SyslogIdentifier=start_haproxy_expoter
+
+[Install]
+WantedBy=multi-user.target
