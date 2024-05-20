@@ -1,0 +1,82 @@
+---
+haproxy_version: "2.8.3"
+haproxy_repository: "https://store.host.local/H"
+haproxy_global_maxconn: 4000
+haproxy_global_cpu_dynamic: true
+haproxy_global_cpu_map_static_cores_number: []
+haproxy_global_log_string: "/dev/log local0"
+haproxy_global_chroot: "/var/lib/haproxy"
+haproxy_global_user: "haproxy"
+haproxy_global_group: "haproxy"
+haproxy_stats_timeout: "30s"
+haproxy_stats_user: ""
+haproxy_stats_password: ""
+haproxy_defaults_mode: "http"
+haproxy_defaults_global_log: true
+haproxy_defaults_options:
+  - "httplog"
+  - "dontlognull"
+  - "forwardfor except 127.0.0.1"
+haproxy_defaults_timeouts:
+  - name: "connect"
+    value: "5s"
+  - name: "client"
+    value: "10s"
+  - name: "server"
+    value: "120s"
+  - name: "client-fin"
+    value: "1s"
+  - name: "server-fin"
+    value: "1s"
+  - name: "http-request"
+    value: "10s"
+  - name: "http-keep-alive"
+    value: "50s"
+haproxy_extended_json_logging: false
+haproxy_extended_json_logging_options:
+  - name: "option"
+    value: "http-buffer-request"
+  - name: "declare capture request len"
+    value: "40000000"
+  - name: "http-request capture req.body id"
+    value: "0"
+  - name: "capture request header user-agent len "
+    value: "150"
+  - name: "capture request header Host len"
+    value: "50"
+  - name: "log-format"
+    value: >
+      'ResponseCode:%ST, ResponseTime:%Tr, Event: {"Event":{"srcIP":"%[src]","backend-name":"%b","backend":"%s",
+      "bIP":"%si","bPORT":"%sp","method":"%[capture.req.method]","user-agent":"%[capture.req.hdr(1),json(utf8s)]",
+      "uri":"%[capture.req.uri]","body":"%[capture.req.hdr(0)]","FullTime":"%Ta"}}'
+haproxy_frontends: []
+haproxy_backends: []
+haproxy_managed_files: []
+memcached_service_state: "started"
+memcached_service_enabled: true
+haproxy_restart_mode: "on-failure"
+haproxy_restart_timeout: "10s"
+haproxy_configs_folder: "/etc/haproxy"
+haproxy_logs_folder: "/var/log/haproxy"
+haproxy_bin_folder: "/usr/local/sbin"
+haproxy_exporter_bin_folder: "/usr/bin"
+haproxy_sysctl_vars:
+  - param: 'fs.inotify.max_user_watches'
+    value: '16384'
+  - param: 'fs.inotify.max_user_instances'
+    value: '256'
+  - param: 'net.ipv4.ip_local_port_range'
+    value: '15000 61000'
+  - param: 'net.core.somaxconn'
+    value: '1024'
+  - param: 'net.core.netdev_max_backlog'
+    value: '2000'
+  - param: 'net.ipv4.tcp_max_syn_backlog'
+    value: '2048'
+  - param: 'fs.file-max'
+    value: '30000'
+firewalld_ports:
+  - '1936/tcp'
+  - '80/tcp'
+  - '443/tcp'
+  - '9101/tcp'
