@@ -1,0 +1,25 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+backend {{ item.name }}
+{{ "  mode %s" % item.mode if item.mode is defined }}
+{% if item.balance_algorythm is defined %}
+  balance {{ item.balance_algorythm }} 
+{% endif %}
+{%if item.options is defined %}
+{% for option in item.options %}
+{{ "  %s" % option.name if option.name is defined }} {{ "%s" % option.value if option.value is defined }}
+{% endfor %}{% endif %}
+
+{% if item.weight_by_the_closest is defined and item.weight_by_the_closest %}
+{% for forward in item.forward %}
+{# spaces after options ("inter %s ") is here for a reason, they are done for formatting purpose #}
+  server {{ forward.name }} {{ forward.uri }} {{ "check " if forward.check is defined and forward.check }}{{ "port %s " % forward.check_port if forward.check_port is defined and forward.check }}{{ "inter %s " % forward.inter if forward.inter is defined }}{{ "fastinter %s " % forward.fastinter if forward.fastinter is defined }}{{ "fall %s " % forward.fall if forward.fall is defined }}{{ "rise %s " % forward.rise if forward.rise is defined }}{{ "on-marked-down %s " % forward.on_marked_down if forward.on_marked_down is defined }}{{ "weight 90" if (inventory_hostname | regex_search('\d{1}'))==(forward.name | regex_search('\d{1}')) }}{{ "weight 5" if (inventory_hostname | regex_search('\d{1}'))!=(forward.name | regex_search('\d{1}')) }}
+{% endfor %}
+{% else %}
+{% for forward in item.forward %}
+  server {{ forward.name }} {{ forward.uri }} {{ "check " if forward.check is defined and forward.check }}{{ "port %s " % forward.check_port if forward.check_port is defined and forward.check }}{{ "inter %s " % forward.inter if forward.inter is defined }}{{ "fastinter %s " % forward.fastinter if forward.fastinter is defined }}{{ "fall %s " % forward.fall if forward.fall is defined }}{{ "rise %s " % forward.rise if forward.rise is defined }}{{ "on-marked-down %s " % forward.on_marked_down if forward.on_marked_down is defined }}{{ "weight %s" % forward.weight if forward.weight is defined }}
+{% endfor %}
+
+{% endif %}
