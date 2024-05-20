@@ -1,0 +1,55 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+# Tomcat instance name: {{ tomcat_instance_name }}
+# Tomcat instance version: {{ tomcat_version }}
+
+[Unit]
+Description=Apache Tomcat {{ tomcat_version }}
+After=syslog.target network.target
+Documentation=https://tomcat.apache.org
+
+[Service]
+User={{ tomcat_user }}
+Group={{ tomcat_group }}
+Type=forking
+
+{% if tomcat_instance_name == "tomcat" %}
+Environment="CATALINA_PID={{ tomcat_simlink_folder }}/tomcat.pid"
+Environment="CATALINA_HOME={{ tomcat_simlink_folder }}"
+Environment="CATALINA_BASE={{ tomcat_simlink_folder }}"
+{% else %}
+Environment="CATALINA_PID=/opt/apache-tomcat-{{ tomcat_version }}/tomcat.pid"
+Environment="CATALINA_HOME=/opt/apache-tomcat-{{ tomcat_version }}"
+Environment="CATALINA_BASE=/opt/apache-tomcat-{{ tomcat_version }}"
+{% endif %}
+Environment="JAVA_OPTS= \
+-server \
+{% if tomcat_debug_option %}
+-Xdebug \
+-Xrunjdwp:transport={{ tomcat_debug_transport }},address={{ tomcat_ports.tomcat_debug_port }},server={{ tomcat_debug_server }},suspend={{ tomcat_debug_suspend }} \
+{% endif %}
+{% if not tomcat_dynamic_memory %}
+-Xms{{ tomcat_xms_mem }} \
+-Xmx{{ tomcat_xmx_mem }} \
+{% else %}
+-Xms{{ (0.92*(ansible_facts.memtotal_mb/1024-tomcat_dynamic_memory_offheap|int))|round(0)|int-1 }}g \
+-Xmx{{ (0.92*(ansible_facts.memtotal_mb/1024-tomcat_dynamic_memory_offheap|int))|round(0)|int }}g \
+{% endif %}
+{% for opt in java_opts %}
+{{ opt }} \
+{% endfor %}
+-javaagent:/opt/apache-tomcat-{{ tomcat_version }}/bin/jmx_prometheus_javaagent-{{ tomcat_jmx_exporter_version }}.jar={{ tomcat_ports.tomcat_jmx_exporter_port }}:/opt/apache-tomcat-{{ tomcat_version }}/conf/jmx-exporter-conf.yml"
+{% if tomcat_instance_name == "tomcat" %}
+ExecStart={{ tomcat_simlink_folder }}/bin/startup.sh
+ExecStop={{ tomcat_simlink_folder }}/bin/shutdown.sh
+{% else %}
+ExecStart=/opt/apache-tomcat-{{ tomcat_version }}/bin/startup.sh
+ExecStop=/opt/apache-tomcat-{{ tomcat_version }}/bin/shutdown.sh
+{% endif %}
+SuccessExitStatus={{ tomcat_success_exit_status }}
+Restart={{ tomcat_restart_mode }}
+RestartSec={{ tomcat_restart_timeout }}
+
+[Install]
+WantedBy=multi-user.target
