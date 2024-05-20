@@ -1,0 +1,238 @@
+---
+- name: get haproxy service status
+  service_facts:
+
+- name: copy haproxy bin file
+  get_url:
+    url: "{{ haproxy_repository }}/haproxy-{{ haproxy_version }}"
+    dest: "{{ haproxy_bin_folder }}/haproxy"
+    mode: 0755
+
+- name: haproxy group
+  group:
+    name: "{{ haproxy_global_group }}"
+    gid: 188
+    state: present
+
+- name: haproxy user
+  user:
+    name: "{{ haproxy_global_user }}"
+    group: "{{ haproxy_global_group }}"
+    uid: 188
+    home: /var/lib/haproxy
+    comment: haproxy user
+    system: true
+    state: present
+
+- name: establishing haproxy env
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ haproxy_global_user }}"
+    group: "{{ haproxy_global_group }}"
+    mode: 0755
+  loop:
+    - "{{ haproxy_configs_folder }}"
+    - "{{ haproxy_logs_folder }}"
+    - "/var/lib/haproxy"
+    - "/var/lib/haproxy/dev"
+
+
+- name: establishing haproxy env 2
+  file:
+    path: "{{ item }}"
+    state: touch
+    owner: "{{ haproxy_global_user }}"
+    group: "{{ haproxy_global_group }}"
+    mode: 0644
+    access_time: preserve
+    modification_time: preserve
+  loop:
+    - "/var/lib/haproxy/stats"
+
+- name: deploy haproxy exporter
+  get_url:
+    url: "https://store.petcorp.ru/H/haproxy_exporter"
+    dest: "{{ haproxy_exporter_bin_folder }}/haproxy_exporter"
+    mode: 0755
+
+- name: haproxy systemd unit file
+  template:
+    src: "haproxy.service.j2"
+    dest: "/etc/systemd/system/haproxy.service"
+    mode: 0644
+  notify:
+    - daemon-reload
+
+- name: haproxy exporter systemd unit file
+  template:
+    src: "haproxy_exporter.service.j2"
+    dest: "/etc/systemd/system/haproxy_exporter.service"
+    mode: 0644
+  notify: daemon-reload
+
+- name: haproxy host rsyslog config file
+  template:
+    src: "haproxy_log.conf.j2"
+    dest: "/etc/rsyslog.d/haproxy.conf"
+    mode: 0644
+  notify:
+    - rsyslog restart
+
+- name: haproxy configs templating block
+  block:
+    - name: template haproxy global config
+      template:
+        src: "haproxy_global.cfg.j2"
+        dest: "/etc/haproxy/01.haproxy_global.cfg"
+        owner: "{{ haproxy_global_user }}"
+        group: "{{ haproxy_global_group }}"
+        mode: 0644
+        backup: true
+      register: template_haproxy_global_config
+
+    - name: template haproxy system frontends
+      template:
+        src: "haproxy_frontends_system.cfg.j2"
+        dest: "/etc/haproxy/02.haproxy_system_frontend.cfg"
+        owner: "{{ haproxy_global_user }}"
+        group: "{{ haproxy_global_group }}"
+        mode: 0644
+        backup: true
+      register: template_haproxy_system_frontends
+
+    - name: template haproxy general frontends
+      template:
+        src: "haproxy_frontends_other.cfg.j2"
+        dest: "/etc/haproxy/03.frontend_{{ item.name }}.cfg"
+        owner: "{{ haproxy_global_user }}"
+        group: "{{ haproxy_global_group }}"
+        mode: 0644
+        backup: true
+      register: template_haproxy_frontends_other
+      loop: "{{ haproxy_frontends }}"
+      when:
+        - haproxy_frontends is defined
+        - not item.system
+
+    - name: template haproxy general backends
+      template:
+        src: "haproxy_backends.cfg.j2"
+        dest: "/etc/haproxy/04.backend_{{ item.name }}.cfg"
+        owner: "{{ haproxy_global_user }}"
+        group: "{{ haproxy_global_group }}"
+        mode: 0644
+        backup: true
+      register: template_haproxy_general_backends
+      loop: "{{ haproxy_backends }}"
+      when: haproxy_backends is defined
+
+    - name: Find all haproxy config files
+      find:
+        paths: "{{ haproxy_configs_folder }}"
+        patterns:
+          - "*.cfg"
+      register: haproxycfg_files
+
+    - name: Look for config backups
+      find:
+        paths: "{{ haproxy_configs_folder }}"
+        use_regex: true
+        patterns:
+          - ".*{{ ansible_date_time.date }}@*.*"
+      register: haproxy_cfg_backups
+
+    - name: Run haproxy validation
+      command:
+        cmd: >-
+          /usr/local/sbin/haproxy {%- for file in haproxycfg_files.files | sort (attribute="path") %} -f {{ file.path }} {%- endfor %} -c
+      when:
+        - template_haproxy_global_config.changed or
+          template_haproxy_system_frontends.changed or
+          template_haproxy_frontends_other.changed or
+          template_haproxy_general_backends.changed
+  rescue:
+    - name: restore backups
+      copy:  # basically rename files using regex_search filter
+        src: "{{ item.path }}"
+        dest: "{{ item.path | regex_search('.+?(?<=.cfg)') }}"
+        remote_src: true
+        mode: 0644
+      loop: "{{ haproxy_cfg_backups.files }}"
+  always:
+    - name: Delete backups if exist
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ haproxy_cfg_backups.files }}"
+      when: haproxy_cfg_backups.files | length > 0
+  tags: haproxy_configs
+  notify:
+    - haproxy reload
+
+- name: "haproxy host sysctl.conf tuning"
+  sysctl:
+    name: "{{ item.param }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+    sysctl_file: /etc/sysctl.d/haproxy.conf
+  loop: "{{ haproxy_sysctl_vars }}"
+  when:
+    haproxy_sysctl_vars is defined
+
+- name: start services
+  systemd:
+    daemon_reload: true
+    name: "{{ item }}"
+    state: "{{ memcached_service_state }}"
+    enabled: "{{ memcached_service_enabled }}"
+  loop:
+    - haproxy.service
+    - haproxy_exporter.service
+  when: not ansible_check_mode
+
+- name: managing unmanaged files
+  block:
+    - name: constructing the list of managed files
+      set_fact:
+        haproxy_managed_files: "{{ haproxy_managed_files +  [item] }}"
+      loop:
+        - "/etc/haproxy/01.haproxy_global.cfg"
+        - "/etc/haproxy/02.haproxy_system_frontend.cfg"
+
+    - name: adding frontends
+      set_fact:
+        haproxy_managed_files: "{{ haproxy_managed_files + ['/etc/haproxy/03.frontend_' ~ item.name ~ '.cfg'] }}"
+      loop: "{{ haproxy_frontends }}"
+      when:
+        - haproxy_frontends is defined
+        - not item.system
+
+    - name: adding backends
+      set_fact:
+        haproxy_managed_files: "{{ haproxy_managed_files +  ['/etc/haproxy/04.backend_' ~ item.name ~ '.cfg'] }}"
+      loop: "{{ haproxy_backends }}"
+
+    - name: getting /etc/haproxy folder contents
+      find:
+        paths: "/etc/haproxy"
+      register: contents
+
+    - name: removing unmanaged files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ contents.files }}"
+      when:
+        - item.path not in haproxy_managed_files
+  tags: haproxy_configs
+  when: not ansible_check_mode
+
+- name: "Flush handlers"
+  meta: flush_handlers
+
+- name: "firewall-ports"
+  include_role:
+    name: firewalld_role
