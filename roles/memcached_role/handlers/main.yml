@@ -1,0 +1,10 @@
+---
+- name: daemon reload
+  systemd:
+    daemon-reload: true
+
+- name: memcached restart
+  service:
+    name: "memcached"
+    state: restarted
+  when: not ansible_check_mode
