@@ -1,0 +1,8 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+DEVICE=lo:1
+IPADDR={{ anycast_ip }}
+NETMASK=255.255.255.255
+ONBOOT=yes
