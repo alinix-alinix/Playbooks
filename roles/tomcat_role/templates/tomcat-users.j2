@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+-->
+
+<tomcat-users xmlns="http://tomcat.apache.org/xml"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+              version="1.0">
+<role rolename="admin"/>
+<role rolename="admin-gui"/>
+<role rolename="admin-script"/>
+<role rolename="manager"/> 
+<role rolename="manager-gui"/> 
+<role rolename="manager-script"/>
+<role rolename="manager-jmx"/> 
+<role rolename="manager-status"/> 
+{% if tomcat_management_app_username | length > 0 and tomcat_management_app_password | length > 0 %}
+<user username="{{ tomcat_management_app_username }}" password="{{ tomcat_management_app_password }}" roles="manager-gui,manager-status,manager-script,manager-jmx,admin-gui" />
+{% endif %}
+</tomcat-users>
