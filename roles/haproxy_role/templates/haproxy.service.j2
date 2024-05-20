@@ -1,0 +1,19 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+[Unit]
+Description=HAProxy balancer
+After=syslog.target network.target
+Documentation=http://docs.haproxy.org/
+
+[Service]
+Type=notify
+ExecStart={{ haproxy_bin_folder }}/haproxy -f {{ haproxy_configs_folder }} -p /var/run/haproxy.pid -Ws
+ExecReload=/bin/kill -USR2 $MAINPID
+ExecStop=/bin/kill -USR1 $MAINPID
+Restart={{ haproxy_restart_mode }}
+RestartSec={{ haproxy_restart_timeout }}
+
+[Install]
+WantedBy=multi-user.target
