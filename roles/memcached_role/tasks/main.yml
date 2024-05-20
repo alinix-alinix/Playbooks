@@ -1,0 +1,48 @@
+---
+- name: get package facts
+  package_facts:
+    manager: auto
+
+- name: prep memcached env group
+  group:
+    name: "{{ memcached_group }}"
+    state: present
+  when:
+    - ansible_facts.packages is not search 'memcached'
+    - ansible_facts.packages is defined
+
+- name: prep memcached env user
+  user:
+    name: "{{ memcached_user }}"
+    group: "{{ memcached_group }}"
+    shell: /bin/false
+  when:
+    - ansible_facts.packages is not search 'memcached'
+    - ansible_facts.packages is defined
+
+- name: template memcached systemd unit
+  template:
+    src: memcached.service.j2
+    dest: /etc/systemd/system/memcached.service
+    mode: 0644
+  notify:
+    - daemon reload
+
+- name: installing memcached package
+  package:
+    name: memcached
+    state: present
+  when:
+    - ansible_facts.packages is not search 'memcached'
+    - ansible_facts.packages is defined
+
+- name: memcached service start
+  service:
+    name: "memcached"
+    enabled: "{{ memcached_service_enabled }}"
+    state: "{{ memcached_service_state }}"
+  when: not ansible_check_mode
+
+- name: "firewall-ports"
+  include_role:
+    name: firewalld_role
