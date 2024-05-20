@@ -1,0 +1,37 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+global
+  maxconn {{ haproxy_global_maxconn }}
+{% if haproxy_global_cpu_dynamic %}
+  nbthread {{ ansible_facts.processor_vcpus }} #assigned dynamically according to cpu number
+{% for i in range(  ansible_facts.processor_vcpus ) %}
+  cpu-map {{ i+1 }} {{ i }} #maps process #{{ i+1 }} to cpu #{{ i }}
+{% endfor %}  
+{% else %}
+  nbthread {{ haproxy_global_cpu_map_static_cores_number }}
+{% for j in range( haproxy_global_cpu_map_static_cores_number ) %}
+  cpu-map {{ j+1 }} {{ j }} #maps process #{{ j+1 }} to cpu #{{ j }}
+{% endfor %}  
+{% endif %}
+
+
+  log {{ haproxy_global_log_string }}
+  chroot {{ haproxy_global_chroot }}
+  stats timeout {{ haproxy_stats_timeout }}
+  user {{ haproxy_global_user }}
+  group {{ haproxy_global_group }}
+  daemon
+
+defaults
+{% if haproxy_defaults_global_log %}
+  log global
+{% endif %}
+  mode {{ haproxy_defaults_mode }}
+{%for option in haproxy_defaults_options %}
+  option {{ option }}
+{% endfor %}
+{%for timeout in haproxy_defaults_timeouts %}
+  timeout {{ timeout.name }} {{ timeout.value }}
+{% endfor %}
