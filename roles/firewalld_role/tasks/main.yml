@@ -1,0 +1,46 @@
+---
+- name: get variables
+  include_tasks:
+    get-facts-variables.yml
+
+- name: install firewalld
+  package:
+    name: "{{ os_firewalld_package_name }}"
+    state: present
+  when:
+    - ansible_facts.packages is not search os_firewalld_package_name
+    - ansible_facts.packages is defined
+
+- name: firewalld ports open ssh
+  firewalld:
+    port: '22/tcp'
+    permanent: true
+    state: enabled
+  notify: firewalld restart
+  when:
+    - ansible_facts.packages is search os_firewalld_package_name
+    - ansible_facts.packages is defined
+
+- name: started firewalld
+  systemd:
+    name: firewalld
+    state: started
+    enabled: true
+  when:
+    - ansible_facts.packages is search os_firewalld_package_name
+    - ansible_facts.packages is defined
+
+- name: firewalld ports open
+  firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ firewalld_ports }}"
+  notify: firewalld restart
+  when:
+    - firewalld_ports is defined
+    - ansible_facts.packages is search os_firewalld_package_name
+    - ansible_facts.packages is defined
+  tags: refresh_configs
+  ignore_errors: "{{ ansible_check_mode }}"
