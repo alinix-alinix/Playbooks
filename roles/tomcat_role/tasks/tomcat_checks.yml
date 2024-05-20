@@ -1,0 +1,77 @@
+---
+- name: set initial redeploy fact
+  set_fact:
+    redeploy: false
+
+- name: main checks block
+  block:
+    # Проверим имя инстанса, не совпадает ли он с имеющимся
+    - name: 1.checking if existing tomcat systemd unit is the same as our instance {{ tomcat_instance_name }}
+      stat:
+        path: "/etc/systemd/system/{{ tomcat_instance_name }}.service"
+      register: tomcat_unit_existence
+
+    # если совпадает - теперь проверим имеющуюся версию томката,
+    # возвращает changed: false, если найдена строка.
+
+    - name: 2.check if tomcat version in the systemd unit is the same as we're going to install.
+      lineinfile:
+        path: "/etc/systemd/system/{{ tomcat_instance_name }}.service"
+        line: "# Tomcat instance version: {{ tomcat_version }}"
+        state: present
+      check_mode: true
+      when: tomcat_unit_existence.stat.exists
+      register: already_have_that_tomcat_version
+
+    # проверим еще пользователя и группу  (2 следующих таски 3-4), из под которого запускается томкат,
+    # возвращает changed: false, если пользователь или группа соответствуют.
+
+    - name: 3.check if tomcat user in unit is exactly the same as {{ tomcat_user }}
+      lineinfile:
+        path: "/etc/systemd/system/{{ tomcat_instance_name }}.service"
+        line: "User={{ tomcat_user }}"
+        state: present
+      check_mode: true
+      when:
+        - not already_have_that_tomcat_version.changed
+        - tomcat_unit_existence.stat.exists
+      register: already_have_that_user
+
+    - name: 4.check if tomcat group in unit is exactly the same as {{ tomcat_user }}
+      lineinfile:
+        path: "/etc/systemd/system/{{ tomcat_instance_name }}.service"
+        line: "Group={{ tomcat_user }}"
+        state: present
+      check_mode: true
+      when:
+        - not already_have_that_tomcat_version.changed
+        - tomcat_unit_existence.stat.exists
+      register: already_have_that_group
+
+    # на основании 4 проверок подводим результаты.
+    # Если что то из вышеперечисленного не OK, делаем полный редеплой
+
+    - name: redeploy var set
+      set_fact:
+        redeploy: true
+      when:
+        - not tomcat_unit_existence.stat.exists or
+          already_have_that_tomcat_version.changed or
+          already_have_that_user.changed or
+          already_have_that_group.changed
+
+# теперь проверим слушающиеся порты на хосте и сравним их с теми что собираемся использовать
+# для установки. Если будут совпадения - выкидываем сообщение и останавливаем playbook
+
+- name: getting ports listened and comparing them to ports we're going to use
+  set_fact:
+    already_used_ports: "{{ ansible_facts.tcp_listen | map(attribute='port') | sort | list
+      | intersect (tomcat_ports | dict2items | flatten | map(attribute='value') | sort ) }}"
+
+- name: ending the play for the current host if we're about to have a port conflict
+  fail:
+    msg: "Host is already listening to those ports: {{ already_used_ports }}. Ajust the ports and play again."
+  when:
+    - already_used_ports | length > 0
+    - redeploy
+    - not tomcat_unit_existence.stat.exists  # проверяем только если ставим рядом второй томкат
