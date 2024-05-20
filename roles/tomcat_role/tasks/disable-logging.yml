@@ -1,0 +1,76 @@
+---
+- name: Debian nullfs install
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - tomcat_paths_to_send_to_nullfs | length > 0
+  block:
+    - name: Get packages facts
+      package_facts:
+        manager:
+          - auto
+
+    - name: Upgrade kernel and headers
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - linux-image-5.10.0-28-amd64
+        - linux-headers-5.10.0-28-amd64
+      when:
+        - ansible_kernel == '5.10.0-20-amd64'
+
+    - name: Install nullfs package
+      apt:
+        deb: https://store.petcorp.ru/N/nullfsvfs_0.17_amd64.deb
+        state: present
+      register: nullfs_install
+
+- name: Install nullfs package
+  yum:  # Kernel will be updated as well, manual reboot is needed here
+    name: "https://negativo17.org/repos/multimedia/epel-7/x86_64/kmod-nullfsvfs-0.17-1.el7.x86_64.rpm"
+    state: present
+  register: nullfs_install
+  when:
+    - ansible_facts.os_family == 'RedHat'
+    - tomcat_paths_to_send_to_nullfs | length > 0
+
+- name: Refresh list of installed kernel modules
+  command: depmod
+  when:
+    - nullfs_install.changed  # noqa 503
+    - tomcat_paths_to_send_to_nullfs | length > 0
+
+- name: Load nullfs module and make sure it is loaded after reboots
+  modprobe:
+    name: nullfs
+    state: present
+    persistent: present
+  when:
+    - tomcat_paths_to_send_to_nullfs | length > 0
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Mount folders to nullfs
+  mount:
+    src: none
+    path: "{{ tomcat_paths_to_send_to_nullfs }}"
+    opts: auto
+    fstype: nullfs
+    state: present
+  when:
+    - tomcat_paths_to_send_to_nullfs | length > 0
+
+- name: suppressing standard logging if flag is set
+  replace:
+    path: /opt/apache-tomcat-{{ tomcat_version }}/conf/logging.properties
+    regexp: '(^\.handlers = .*|^handlers = .*)'
+    replace: '# \1'
+  when:
+    - not ansible_check_mode
+
+- name: Send catalina.out to /dev/null
+  file:
+    src: /dev/null
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/logs/catalina.out"
+    state: link
+    force: true
+  ignore_errors: "{{ ansible_check_mode }}"
