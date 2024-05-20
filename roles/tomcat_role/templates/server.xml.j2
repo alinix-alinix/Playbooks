@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+-->
+
+<Server port="8005" shutdown="SHUTDOWN">
+  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
+  <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />
+  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
+  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
+
+  <GlobalNamingResources>
+    <Resource name="UserDatabase" auth="Container"
+              type="org.apache.catalina.UserDatabase"
+              description="User database that can be updated and saved"
+              factory="org.apache.catalina.users.MemoryUserDatabaseFactory"
+              pathname="conf/tomcat-users.xml" />
+  </GlobalNamingResources>
+
+  <Service name="Catalina">
+
+    <!-- HTTP connector -->
+{% if tomcat_http_active %}
+    <Connector port="{{ tomcat_ports.tomcat_http_port }}" protocol="{{ tomcat_http_protocol }}"
+               maxThreads="{{ tomcat_http_max_threads }}"
+               connectionTimeout="{{ tomcat_http_connection_timeout }}"
+               maxPostSize="{{ tomcat_http_max_post_size }}"
+               redirectPort="{{ tomcat_ports.tomcat_https_port }}"
+               address="{{ tomcat_http_address }}" />
+{% else %}
+    <!-- NOT USED -->
+{% endif %}
+
+    <!-- HTTPS connector -->
+{% if tomcat_https_active %}
+    <Connector port="{{ tomcat_ports.tomcat_https_port }}" protocol="{{ tomcat_https_protocol }}"
+               maxThreads="{{ tomcat_https_max_threads }}"
+               connectionTimeout="{{ tomcat_https_connection_timeout }}"
+               maxPostSize="{{ tomcat_https_max_post_size }}"
+               address="{{ tomcat_https_address }}" 
+               SSLEnabled="{{ tomcat_https_ssl_enabled }}" >
+        <UpgradeProtocol className="org.apache.coyote.http2.Http2Protocol" />
+        <SSLHostConfig>
+            <Certificate certificateKeyFile="{{ tomcat_https_ssl_certificate_key_file }}"
+                         certificateFile="{{ tomcat_https_ssl_certificate_file }}"
+                         certificateChainFile="{{ tomcat_https_ssl_certificate_chain_file }}"
+                         type="{{ tomcat_https_ssl_cert_type }}" />
+        </SSLHostConfig>
+    </Connector>
+{% else %}
+    <!-- NOT USED -->
+{% endif %}
+
+    <!-- AJP connector -->
+{% if tomcat_ajp_active %}
+    <Connector port="{{ tomcat_ports.tomcat_ajp_port }}" protocol="{{ tomcat_ajp_protocol }}"
+               maxThreads="{{ tomcat_ajp_max_threads }}"
+               connectionTimeout="{{ tomcat_ajp_connection_timeout }}"
+               maxPostSize="{{ tomcat_ajp_max_post_size }}"
+               redirectPort="{{ tomcat_ports.tomcat_https_port }}"
+               address="{{ tomcat_ajp_address }}" 
+               secretRequired="{{ tomcat_ajp_secret_required }}" 
+               {% if tomcat_ajp_secret_required  %}
+               secret="{{ tomcat_ajp_secret }}" />
+               {% else %}
+               />
+               {% endif %}
+{% else %}
+    <!-- NOT USED -->
+{% endif %}
+
+    <Engine name="Catalina" defaultHost="localhost"{% if tomcat_ajp_jvm_route | length >0 %} jvmRoute="{{ tomcat_ajp_jvm_route }}"{% endif %}>
+
+      <valve className="org.apache.catalina.valves.RemoteIpValve"
+                requestAttributesEnabled="true"
+                internalProxies="{% for fqdn in groups['all']| select('match', '.*balancers.*') | list %}{{ lookup('dig', fqdn) }}|{% endfor %}127/8"
+                remoteIpHeader="x-forwarded-for"
+                remoteIpProxiesHeader="x-forwarded-by"
+                protocolHeader="x-forwarded-proto"/>
+
+      <Realm className="org.apache.catalina.realm.LockOutRealm">
+        <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
+               resourceName="UserDatabase"/>
+      </Realm>
+
+      <Host name="localhost"  appBase="webapps"
+            unpackWARs="true" autoDeploy="true">
+
+    <!-- Localhost access logging -->
+{% if not tomcat_suppress_logging_access_log %}
+        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
+               requestAttributesEnabled="true"
+               pattern="%{X-Forwarded-For}i %l %u %t &quot;%r&quot; %s %b &quot;%{Referer}i&quot; &quot;%{User-agent}i&quot;"
+               prefix="localhost_access_log" suffix=".txt" />
+{% else %}
+    <!-- NOT USED -->
+{% endif %}
+
+
+      </Host>
+    </Engine>
+  </Service>
+</Server>
