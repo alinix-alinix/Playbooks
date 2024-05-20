@@ -1,0 +1,22 @@
+---
+- name: get variables
+  include_tasks:
+    get-facts-variables.yml
+
+- name: install java
+  include_role:
+    name: java-role
+  when: install_java
+
+- name: tomcat preinstall checks
+  include_tasks:
+    tomcat_checks.yml
+
+- name: install tomcat
+  include_tasks:
+    tomcat.yml
+
+- name: deploy zabbix agent
+  include_role:
+    name: zabbix_agent_role
+  when: tomcat_zabbix_required
