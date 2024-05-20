@@ -1,0 +1,19 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+[Unit]
+Description=BIRD Internet Routing Daemon
+Documentation=http://bird.network.cz/
+After={{ anycast_leader_service }}.service
+BindsTo={{ anycast_leader_service }}.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/bird -f -u {{ birdusername|default('bird') }} -g {{ birdgroup|default('bird') }} -c /etc/bird.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+WantedBy={{ anycast_leader_service }}.service
