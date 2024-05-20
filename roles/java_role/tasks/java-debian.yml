@@ -1,0 +1,58 @@
+---
+- name: check for current version of java existance
+  stat:
+    path: /opt/jdk/{{ java_origin }}-{{ java_version }}
+  register:
+    java_folder_existence
+
+- name: mkdir /opt/jdk/{{ java_origin }}-{{ java_version }}
+  file:
+    path: /opt/jdk/{{ java_origin }}-{{ java_version }}
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  when:
+    not java_folder_existence.stat.exists
+
+- name: unarchive java {{ java_origin }}-{{ java_version }}
+  unarchive:
+    remote_src: true
+    src: "{{ java_repository }}/{{ java_origin }}-{{ java_version }}-linux-x64.tar.gz"
+    dest: /opt/jdk/{{ java_origin }}-{{ java_version }}
+  when:
+    - not java_folder_existence.stat.exists
+    - not ansible_check_mode
+
+- name: setting proper ownership of /opt/jdk/{{ java_origin }}-{{ java_version }} just in case
+  file:
+    path: /opt/jdk/{{ java_origin }}-{{ java_version }}
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  when:
+    not java_folder_existence.stat.exists
+
+- name: find java binary in new folder
+  find:
+    paths: /opt/jdk/{{ java_origin }}-{{ java_version }}
+    use_regex: true
+    patterns: '^java$'
+    recurse: true
+    depth: 3
+  register:
+    search_result
+  when:
+    - not java_folder_existence.stat.exists
+    - not ansible_check_mode
+
+- name: update alternatives for new java
+  community.general.alternatives:
+    name: java
+    path: "{{ search_result.files[0].path }}"
+    link: /usr/bin/java
+    priority: 100
+  when:
+    - not java_folder_existence.stat.exists
+    - not ansible_check_mode
