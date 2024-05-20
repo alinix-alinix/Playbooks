@@ -29,9 +29,10 @@
 
 Service area will be applied automatically. Still you can override the service area id by using this combination of variables, but in most cases this is useless:
 
-anycast_ospf_auto_area: false
+anycast_ospf_auto_area: false 
 anycast_ospf_area_manual: "100.1.1.1"
 
 anycast_leader_service variable allow you to link bird service to some other service. If Leading service is killed or stopped, the same will happen to bird.
-Important: Make sure the leader service is already present in the systemd. In case you're goin to add it later in the playbook, you should add post_task reenabling bird to form correct systemd simlinks
-# systemd reenable bird
+Important: Make sure the leader service is already present in the systemd. In case you're going to add it later in the playbook, you should add post_task reenabling bird to form correct systemd symlinks
+or you can do it manually:
+systemd reenable bird
