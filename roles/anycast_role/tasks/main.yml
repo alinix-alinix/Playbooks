@@ -1,0 +1,62 @@
+---
+- name: template anycast config file ifcfg-lo:1 for centos
+  template:
+    src: anycast-ip-cent.j2
+    dest: /etc/sysconfig/network-scripts/ifcfg-lo:1
+    mode: 0644
+  notify: network restart
+  when:
+    - ansible_facts.os_family == "RedHat"
+
+- name: template anycast config file lo1 for debian
+  template:
+    src: anycast-ip-deb.j2
+    dest: /etc/network/interfaces.d/lo1
+    mode: 0644
+  notify: network restart
+  when:
+    - ansible_facts.os_family == "Debian"
+
+- name: flush_handlers
+  meta: flush_handlers
+
+- name: bird deployment
+  package:
+    name: bird
+    state: present
+
+- name: template bird systemd unit file
+  template:
+    src: bird.service.j2
+    dest: /etc/systemd/system/bird.service
+    mode: 0644
+  notify: bird restart
+
+- name: template bird config
+  template:
+    src: bird.conf.j2
+    dest: /etc/bird.conf
+    validate: /usr/sbin/bird -pc %s
+    owner: root
+    group: "{{ anycast_service_group_name|default('bird') }}"
+    mode: 0644
+  notify: bird restart
+
+- name: flush hanlders
+  meta: flush_handlers
+
+- name: ensure bird service is started and enabled
+  systemd:
+    name: bird
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: firewalld ospf port
+  firewalld:
+    rich_rule: rule protocol value="89" accept
+    state: enabled
+    permanent: true
+    immediate: true
+  notify: firewalld restart
