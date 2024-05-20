@@ -1,0 +1,8 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+#log  #password
+{% if tomcat_jmx_user | length > 0 and tomcat_jmx_password | length > 0 %}
+{{ tomcat_jmx_user }} {{ tomcat_jmx_password }}
+{% endif %}
