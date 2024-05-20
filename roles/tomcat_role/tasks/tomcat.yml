@@ -1,0 +1,232 @@
+---
+- name: setting the most important java_opts fact
+  set_fact:
+    java_opts: "{{ java_opts_default + java_opts_additional }}"
+
+- name: prep tomcat env group
+  group:
+    name: "{{ tomcat_group }}"
+    state: present
+  when:
+    - redeploy
+
+- name: prep tomcat env user
+  user:
+    name: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    shell: /bin/false
+  when:
+    - redeploy
+
+- name: prep tomcat additional env folders if defined
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+  loop: "{{ tomcat_additional_folders }}"
+  when:
+    - tomcat_additional_folders is defined
+
+- name: unzip tomcat
+  unarchive:
+    remote_src: true
+    src: "{{ tomcat_repository }}/apache-tomcat-{{ tomcat_version }}.zip"
+    dest: "/opt"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+  when:
+    - redeploy
+    - not ansible_check_mode
+
+- name: Allow tomcat group to write to certain directories
+  file:
+    state: directory
+    dest: "{{ item }}"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0775
+  loop:
+    - /opt/apache-tomcat-{{ tomcat_version }}/webapps
+    - /opt/apache-tomcat-{{ tomcat_version }}/conf
+
+- name: memcached files download
+  get_url:
+    url: "{{ tomcat_memcached_repository }}/{{ item }}"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/lib/{{ item }}"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+  loop:
+    - "memcached-session-manager-{{ tomcat_memcached_session_manager_tc_version }}.jar"
+    - "memcached-session-manager-{{ tomcat_memcached_session_manager_version }}.jar"
+    - "spymemcached-{{ tomcat_memcached_spymemcached_version }}.jar"
+  when:
+    - tomcat_memcached_used
+    - not ansible_check_mode
+
+- name: template context.xml file
+  template:
+    src: "context.xml.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/conf/context.xml"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: set sysctl.d/tomcat.conf
+  sysctl:
+    name: "{{ item.param }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+    sysctl_file: /etc/sysctl.d/tomcat.conf
+  loop: "{{ tomcat_sysctl_vars }}"
+  when:
+    - tomcat_sysctl_vars is defined
+
+- name: remote-users-file
+  template:
+    src: "remote.users.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/conf/remote.users"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: tomcat-users-for-remote-management-file
+  template:
+    src: "tomcat-users.xml.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/conf/tomcat-users.xml"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: tweak tomcat web-ui upload size limit
+  replace:
+    path: /opt/apache-tomcat-{{ tomcat_version }}/webapps/manager/WEB-INF/web.xml
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - {regexp: <max-file-size>.*</max-file-size>, replace: "<max-file-size>{{ tomcat_filesize_upload_limit }}</max-file-size>"}
+    - {regexp: <max-request-size>.*</max-request-size>, replace: "<max-request-size>{{ tomcat_filesize_upload_limit }}</max-request-size>"}
+  when:
+    - tomcat_filesize_upload_limit | length > 0
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: add default tomcat systemd unit file if there is no such file present
+  template:
+    src: "tomcat.service.j2"
+    dest: "/etc/systemd/system/{{ tomcat_instance_name }}.service"
+    mode: 0644
+  notify: daemon-reload
+
+- name: get jmx-monitoring-file
+  get_url:
+    url: "{{ tomcat_jmx_exporter_repository }}/jmx_prometheus_javaagent-{{ tomcat_jmx_exporter_version }}.jar"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/bin/jmx_prometheus_javaagent-{{ tomcat_jmx_exporter_version }}.jar"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+  when:
+    - redeploy
+    - not ansible_check_mode
+
+- name: jmx-monitoring-conf-file
+  template:
+    src: "jmx_monitoring_config.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/conf/jmx-exporter-conf.yml"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: template remote user acl
+  template:
+    src: "remote.acl.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/conf/remote.acl"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: template tomcat remote management context file
+  template:
+    src: "manager_app_context.xml.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/webapps/manager/META-INF/context.xml"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: template tomcat server.xml
+  template:
+    src: "server.xml.j2"
+    dest: "/opt/apache-tomcat-{{ tomcat_version }}/conf/server.xml"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    mode: 0600
+
+- name: parse /opt/apache-tomcat-{{ tomcat_version }}/bin
+  find:
+    paths: "/opt/apache-tomcat-{{ tomcat_version }}/bin"
+    patterns: "*.sh"
+  register: list_of_files
+  when:
+    - redeploy
+
+- name: Make all parsed files executable
+  file:
+    path: "{{ item.path }}"
+    mode: 0755
+  loop: "{{ list_of_files.files | flatten }}"
+  when:
+    - redeploy
+
+- name: Disabling catalina logging if suppress logging catalina flag is set
+  include_tasks:
+    file: disable-logging.yml
+  when:
+    - tomcat_suppress_logging_catalina
+
+- name: symlink for logs {{ tomcat_version }}/logs to /var/log
+  file:
+    src: "/opt/apache-tomcat-{{ tomcat_version }}/logs"
+    dest: "/var/log/tomcat{{ tomcat_version }}"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    state: link
+  when:
+    - redeploy
+    - not ansible_check_mode
+
+- name: symlink for configs /opt/apache-tomcat-{{ tomcat_version }}/conf to /etc
+  file:
+    src: "/opt/apache-tomcat-{{ tomcat_version }}/conf"
+    dest: "/etc/tomcat{{ tomcat_version }}"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    state: link
+  when:
+    - redeploy
+    - not ansible_check_mode
+
+- name: symlink to /opt/tomcat only if default instance name is used
+  file:
+    src: "/opt/apache-tomcat-{{ tomcat_version }}"
+    dest: "{{ tomcat_simlink_folder }}"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    state: link
+  when:
+    - tomcat_instance_name == "tomcat"
+    - redeploy
+    - not ansible_check_mode
+
+- name: service {{ tomcat_instance_name }} start
+  service:
+    name: "{{ tomcat_instance_name }}"
+    enabled: "{{ tomcat_service_enabled }}"
+    state: "{{ tomcat_service_state }}"
+  when:
+    - redeploy
+    - not ansible_check_mode
+
+- name: "firewall-ports"
+  include_role:
+    name: firewalld_role
