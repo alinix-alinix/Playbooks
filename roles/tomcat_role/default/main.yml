@@ -1,0 +1,129 @@
+---
+install_java: true
+java_origin: "jdk"  # "jdk" or "zulu"
+java_version: "8u301"
+tomcat_instance_name: "tomcat"
+tomcat_user: "tomcat"
+tomcat_group: "tomcat"
+tomcat_repository: "https://store.petcorp.ru/A/"
+tomcat_simlink_folder: "/opt/tomcat"
+tomcat_version: "9.0.52"
+tomcat_dynamic_memory: false
+tomcat_xms_mem: 256m  # если флаг динамической памяти false,
+tomcat_xmx_mem: 2g  # указываем ручками xms и xmx, в гигах или мегах
+tomcat_dynamic_memory_offheap:  # если флаг динамической памяти true, необходимо передать в роль рассчитанный
+# для приложения прогноз по offheap, который будет учитываться при выделении памяти под кучу
+tomcat_debug_option: false  # https://stackoverflow.com/questions/45307947/how-to-enable-tomcat-debugging
+tomcat_debug_transport: "dt_socket"  # дебаг через сокет, может быть еще dt_shmem, тогда дебаг через расшаренную память
+# и только локальный дебаг на машине с дебагером
+tomcat_debug_server: "y"  # y/n - открыть, не открыть сокет
+tomcat_debug_suspend: "n"  # y/n чтобы дебагер мог приостанавливать работу JVM, устанавливаем "y"
+tomcat_ports:
+  tomcat_http_port: 8080
+  tomcat_https_port: 8443
+  tomcat_ajp_port: 8009
+  tomcat_jmx_exporter_port: 7070
+  tomcat_jmxremote_port: 8990
+  tomcat_jmxremote_rmi_port: 8990
+  tomcat_debug_port: 31337
+# tomcat_connectors:
+# http
+tomcat_http_active: true
+tomcat_http_max_threads: 150
+tomcat_http_connection_timeout: 20000
+tomcat_http_max_post_size: 2097152
+tomcat_http_address: "0.0.0.0"
+tomcat_http_protocol: "org.apache.coyote.http11.Http11NioProtocol"
+# https
+tomcat_https_active: false
+tomcat_https_max_threads: 150
+tomcat_https_connection_timeout: 20000
+tomcat_https_max_post_size: 2097152
+tomcat_https_address: "0.0.0.0"
+tomcat_https_protocol: "org.apache.coyote.http11.Http11NioProtocol"
+tomcat_https_ssl_enabled: "true"  # string
+tomcat_https_ssl_certificate_key_file: "path_to_cert"
+tomcat_https_ssl_certificate_file: "path_to_cert"
+tomcat_https_ssl_certificate_chain_file: "path_to_cert"
+tomcat_https_ssl_cert_type: "RSA"
+# ajp
+tomcat_ajp_active: false
+tomcat_ajp_jvm_route: ""
+tomcat_ajp_max_threads: 150
+tomcat_ajp_connection_timeout: 20000
+tomcat_ajp_max_post_size: 2097152
+tomcat_ajp_address: "0.0.0.0"
+tomcat_ajp_protocol: "AJP/1.3"
+tomcat_ajp_secret_required: false
+tomcat_ajp_secret: ""  # should not be set if secret_required flag is false
+# systemd unit
+tomcat_service_state: "started"
+tomcat_service_enabled: "true"
+tomcat_restart_mode: "on-failure"
+tomcat_restart_timeout: "10s"
+tomcat_success_exit_status: 143
+# periphery
+tomcat_filesize_upload_limit: "200000000"  # in bytes
+tomcat_jmx_exporter_repository: "https://store.petcorp.ru/J/Java/"
+tomcat_jmx_exporter_version: "0.16.1"
+tomcat_jmx_user: ""
+tomcat_jmx_password: ""
+tomcat_jmx_exporter_exposed_beans:
+  - "java.lang:type=OperatingSystem"
+tomcat_management_app_username: ""
+tomcat_management_app_password: ""
+tomcat_memcached_repository: "https://store.petcorp.ru/M/memcached/"
+tomcat_memcached_used: false
+tomcat_memcached_session_manager_tc_version: "tc9-2.3.2"
+tomcat_memcached_session_manager_version: "2.3.2"
+tomcat_memcached_spymemcached_version: "2.12.3"
+tomcat_memcached_connect_string: ""
+tomcat_memcached_sticky: false
+tomcat_memcached_session_backup_async: false
+tomcat_memcached_locking_mode: "auto"
+tomcat_memcached_ignore_pattern: '.*\.(ico|png|gif|jpg|css|js)$'
+tomcat_memcached_enable_statistics: true
+# java_opts
+java_opts_default:
+  - "-XX:+UseG1GC"  # garbage collector type
+  - "-XX:+UseLinuxPosixThreadCPUClocks"
+  # - "-XX:-ScavengeBeforeFullGC"  # ignite specific
+  # - "-XX:+DisableExplicitGC"  # ignite specific
+  # - "-XX:NativeMemoryTracking=summary"  # in case we need NMT for diagnostic purposes. It is said to consume more CPU (up to 5%).
+  - "-XX:+UnlockCommercialFeatures"
+  - "-XX:+FlightRecorder"
+  # garbage collector specific
+  - "-XX:+PrintGCDateStamps"
+  - "-XX:+PrintGCDetails"
+  - "-XX:+PrintGCApplicationStoppedTime"
+  - "-XX:+PrintGCApplicationConcurrentTime"
+  - "-XX:+PrintHeapAtGC"
+  - "-Xloggc:/opt/apache-tomcat-{{ tomcat_version }}/logs/gc.log"
+  # jmx remote
+  - "-Dcom.sun.management.jmxremote"
+  - "-Dcom.sun.management.jmxremote.ssl=false"
+  - "-Dcom.sun.management.jmxremote.password.file=/opt/tomcat/conf/remote.users"
+  - "-Dcom.sun.management.jmxremote.access.file=/opt/tomcat/conf/remote.acl"
+  - "-Djava.rmi.server.hostname={{ ansible_ssh_host }}"
+  - "-Dcom.sun.management.jmxremote.port={{ tomcat_ports.tomcat_jmxremote_port }}"
+  - "-Dcom.sun.management.jmxremote.rmi.port={{ tomcat_ports.tomcat_jmxremote_rmi_port }}"
+java_opts_additional: []  # by default is empty. Not causing errors in list merge.
+# OS environment
+tomcat_additional_folders: []  # not defined by default
+tomcat_os_environment: []
+tomcat_sysctl_vars: []
+tomcat_additional_ports: []
+tomcat_zabbix_required: false
+tomcat_suppress_logging_catalina: false
+tomcat_suppress_logging_access_log: true
+tomcat_basic_firewall_ports:
+  - "{{ tomcat_ports.tomcat_http_port }}/tcp"
+  - "{{ tomcat_ports.tomcat_https_port }}/tcp"
+  - "{{ tomcat_ports.tomcat_ajp_port }}/tcp"
+  - "{{ tomcat_ports.tomcat_jmx_exporter_port }}/tcp"
+  - "{{ tomcat_ports.tomcat_jmxremote_rmi_port }}/tcp"
+  - "{{ tomcat_ports.tomcat_jmxremote_port }}/tcp"
+  - "{{ tomcat_ports.tomcat_debug_port }}/tcp"
+
+firewalld_ports: "{{ tomcat_basic_firewall_ports + tomcat_additional_ports }}"
+tomcat_paths_to_send_to_nullfs: []  # OPS-3536
