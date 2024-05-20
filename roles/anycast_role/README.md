@@ -21,7 +21,7 @@
   tags: test
 ```
 
-## This role allows you to anycast whatever you want. Anycast services have to be deployed only in 3 DCs of one certain company, because this playbook is created according to existing OSPF service areas. But i strongly believe it's pretty simple to adopt this role to any network layout.
+## This role allows you to anycast whatever you want. Anycast services have to be deployed only in 3 DCs of one certain company, because this playbook is created according to existing OSPF service areas. But i strongly believe it's pretty simple to adapt this role to any network layout.
 
 - DC1: 98.0.1.1
 - DC2: 98.0.2.1
