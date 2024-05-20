@@ -1,0 +1,26 @@
+---
+anycast_ip: ""
+anycast_ospf_area: ""
+anycast_ospf_area_network_type: "broadcast"
+anycast_ospf_interface_cost: ""
+anycast_ospf_interface_priority: ""
+# all the following values in seconds:
+anycast_ospf_retransmit_interval: 5
+anycast_ospf_transmit_delay: 1
+anycast_ospf_hello_interval: 2
+anycast_ospf_router_dead_interval: 10
+
+# auth methods:
+# - cryptographic in case of MD5
+# - simple in case of non-encrypted
+# - none in case if no auth is required
+anycast_ospf_auth_metod: "cryptographic"
+anycast_ospf_auth_key: ""
+anycast_ospf_auth_key_id: ""
+
+anycast_leader_service: ""  # bird service will be shut down if leader service shuts down
+anycast_service_user_name: "root"
+anycast_service_group_name: "bird"
+
+anycast_ospf_auto_area: true
+anycast_ospf_area_manual: ""
