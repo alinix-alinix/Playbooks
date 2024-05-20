@@ -1,0 +1,15 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+{% for frontend in haproxy_frontends %}
+{% if frontend.system %}
+
+listen {{ frontend.name }}
+  bind {{ frontend.bind }}
+  mode {{ frontend.mode }}
+{% for option in frontend.options %}
+  {{ option.name }} {{ option.value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
