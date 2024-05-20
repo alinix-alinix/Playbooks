@@ -1,0 +1,8 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+auto lo:1
+iface lo:1 inet static
+	address {{ anycast_ip }}
+	netmask 255.255.255.255
