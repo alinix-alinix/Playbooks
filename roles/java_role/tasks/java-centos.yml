@@ -1,0 +1,15 @@
+---
+- name: get package facts
+  package_facts:
+    manager: auto
+
+- name: download java {{ java_origin }}-{{ java_version }}
+  get_url:
+    url: "{{ java_repository }}/{{ java_origin }}-{{ java_version }}-linux-x64.rpm"
+    dest: "/tmp/{{ java_origin }}-{{ java_version }}-linux-x64.rpm"
+
+- name: java_deploy
+  yum:
+    name: /tmp/{{ java_origin }}-{{ java_version }}-linux-x64.rpm
+    state: installed
+  when: not ansible_check_mode
