@@ -1,0 +1,14 @@
+---
+- name: get package facts
+  package_facts:
+    manager: auto
+  when:
+    ansible_facts.packages is not defined
+
+- name: get service facts
+  service_facts:
+  when:
+    ansible_facts.service is not defined
+
+- name: get listen ports facts
+  listen_ports_facts:
