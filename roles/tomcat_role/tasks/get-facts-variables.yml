@@ -1,0 +1,18 @@
+---
+- name: get users {{ inventory_hostname }}
+  getent:
+    database: passwd
+
+- name: get groups
+  getent:
+    database: group
+
+- name: get package facts
+  package_facts:
+    manager: auto
+
+- name: get service facts
+  service_facts:
+
+- name: Gather facts on listening ports
+  listen_ports_facts:
