@@ -1,0 +1,61 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+router id {{ lookup('dig', ansible_host) }}; 
+
+protocol device {
+	scan time 10; # Scan interfaces every 10 seconds
+
+}
+
+protocol direct lo{
+        interface "lo*";
+}
+
+protocol kernel {
+        metric 64;      # Use explicit kernel route metric to avoid collisions
+                        # with non-BIRD routes in the kernel routing table
+        import all;
+        export all;     # Actually insert routes into the kernel routing table
+}
+
+filter export_OSPF {
+	if net ={{ anycast_ip }}/32 then {
+	print "net accepted:", net;	
+	accept;
+	}
+	else {
+	reject;
+	}
+}
+
+
+protocol ospf myOSPF {
+
+    import none;
+    export filter export_OSPF;
+{% if anycast_ospf_area_auto %}   
+    area 98.0.{{ (inventory_hostname | regex_search('\d{1}')) }}.1 {  # this is used to determine area id, according to a DC encoded in hostname, for example: stg-dev-pql301. First digit is a DC number
+{% else %}
+    area {{ anycast_ospf_area_manual }} {
+{% endif %} 
+        stubnet {{ anycast_ip }}/32 {
+               cost 1;
+        };
+        interface "{{ ansible_facts.default_ipv4.interface }}" {
+               cost {{ anycast_ospf_interface_cost }};
+               priority {{ anycast_ospf_interface_priority }};
+               type {{ anycast_ospf_area_network_type }};
+               retransmit {{ anycast_ospf_retransmit_interval }}; 
+               transmit delay {{ anycast_ospf_transmit_delay }}; 
+               hello {{ anycast_ospf_hello_interval }};
+	       dead {{ anycast_ospf_router_dead_interval }};
+               password "{{ anycast_ospf_auth_key }}" {
+	           id {{ anycast_ospf_auth_key_id }};
+               };
+               authentication {{ anycast_ospf_auth_metod }}; 
+	
+        };
+    };
+}
