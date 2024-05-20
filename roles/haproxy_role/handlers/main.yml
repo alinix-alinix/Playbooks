@@ -1,0 +1,15 @@
+---
+- name: "haproxy reload"
+  systemd:
+    name: haproxy
+    state: reloaded
+  when: not ansible_check_mode
+
+- name: "daemon-reload"
+  systemd:
+    daemon_reload: true
+
+- name: "rsyslog restart"
+  systemd:
+    name: rsyslog
+    state: restarted
