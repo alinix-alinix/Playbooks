@@ -1,0 +1,28 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+frontend {{ item.name }}
+  bind {{ item.bind }}
+  {{ "mode %s" % item.mode if item.mode is defined }}
+{%if item.options is defined %}
+{% for option in item.options %}
+{{ "  %s" % option.name if option.name is defined }} {{ "%s" % option.value if option.value is defined }}
+{% endfor %}{% endif %}
+
+{% if haproxy_extended_json_logging and item.mode == "http" %}
+# Extended json logging block
+{%for logging_option in haproxy_extended_json_logging_options %}
+  {{ logging_option.name }} {{ logging_option.value }}
+{% endfor %}{% endif %}
+
+# ACLS if any
+{% for acl in item.acl %}
+  acl {{ acl.name }} {{ acl.criteria }} {{ acl.value }}
+{% endfor %}
+
+# Backends distribution
+{% for backend in item.use_backend %}
+  use_backend {{ backend.name }}{{ " if %s" % backend.criteria if backend.criteria is defined and backend.criteria | length >0 }}
+{% endfor %}
+
