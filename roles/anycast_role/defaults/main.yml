@@ -22,5 +22,5 @@ anycast_leader_service: ""  # bird service will be shut down if leader service s
 anycast_service_user_name: "root"
 anycast_service_group_name: "bird"
 
-anycast_ospf_auto_area: true
+anycast_ospf_area_auto: true
 anycast_ospf_area_manual: ""
