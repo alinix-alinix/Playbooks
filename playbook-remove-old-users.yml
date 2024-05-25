@@ -1,4 +1,4 @@
-- name: Removing users, listed in group_vars/all/fired_workers.yml. Also cleaning out root account from their keys
+- name: Removing users, listed in group_vars/all/old_users.yml. Also cleaning out root account from their keys
   gather_facts: true
   hosts: all
   become: true
@@ -11,7 +11,7 @@
       set_fact:
         host_users: "{{ getent_passwd|dict2items|selectattr('value', 'contains', '/bin/bash')|map(attribute='key') }}"
 
-    - name: removing host users, listed in group_vars/all/fired_workers.yml
+    - name: removing host users, listed in group_vars/all/old_users.yml
       user:
         name: "{{ item.username }}"
         state: absent
