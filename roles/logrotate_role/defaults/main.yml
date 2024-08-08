@@ -1,0 +1,23 @@
+---
+logrotate_folder: "/etc/logrotate.d"
+logrotate_hourly_timer_path: "/etc/systemd/system/logrotate-hourly.timer"
+logrotate_systemd_unit_path: "/etc/systemd/system/logrotate.service"
+logrotate_filename: ""
+logrotate_retention_days: 10
+logrotate_period: "daily"
+logrotate_task_list:
+  - log_file_mask: ""
+    switch_user: ""
+    copytruncate: true
+    nocreate: false
+    delaycompress: false
+    notifempty: true
+    compress: true
+    missingok: true
+    postrorate: false
+    postrotate_script: ""
+logrotate_available_periods:
+  - "daily"
+  - "hourly"
+  - "weekly"
+  - "monthly"

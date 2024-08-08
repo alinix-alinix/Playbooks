@@ -1,0 +1,8 @@
+{{ ansible_managed | comment }}
+{{ bash_log_path }} {
+    daily
+    dateext
+    rotate 30
+    compress
+    copytruncate
+}

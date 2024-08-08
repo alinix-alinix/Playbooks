@@ -1,0 +1,32 @@
+---
+- name: Deploy pymongo driver
+  package:
+    name: "{{ mongodb_pymongo_package }}"
+    state: present
+
+- name: template config with bind address, repl-set, keyfile
+  template:
+    src: mongod.conf
+    dest: /etc/mongod.conf
+    mode: 0644
+    owner: "{{ mongodb_username }}"
+    group: "{{ mongodb_username }}"
+  notify: mongod restart
+
+- name: flush_handlers
+  meta: flush_handlers
+
+- name: waiting 30 secs to ensure cluster is assembled  # критично только для последующих запусков роли, когда узел с монго, например, заливется с нуля
+  pause:
+    seconds: 30
+  when:
+    not ansible_check_mode
+
+# это необходимо только при первой заливке КЛАСТЕРА, создать кластер, обозначить его члены, дальше оно само
+# - name: Ensure replicaset rs0 exists
+#  mongodb_replicaset:
+#    login_host: "{{ ansible_host }}"
+#    replica_set: "{{ mongodb_replicaset_name }}"
+#    members: "{{ ansible_play_hosts }}"
+#  when:
+#    - mongodb_rs_master

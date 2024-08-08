@@ -1,0 +1,25 @@
+---
+- name: set timedate
+  timezone:
+    name: Europe/Moscow
+
+- name: fixed /etc/resolv.conf
+  blockinfile:
+    create: true
+    path: /etc/resolv.conf
+    state: present
+    mode: 0644
+    block: |
+      {% for ip in init_default_nameservers %}
+      nameserver {{ ip }}
+      {% endfor %}
+      options timeout:1 attempts:3 rotate
+
+- name: install locales-all
+  apt:
+    name: locales-all
+    state: present
+    update_cache: true
+  ignore_errors: "{{ ansible_check_mode }}"
+  when:
+    - ansible_os_family == 'Debian'

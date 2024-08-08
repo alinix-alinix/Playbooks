@@ -1,0 +1,22 @@
+---
+- name: "els restart - Block"
+  block:
+    - name: "els restart task"
+      systemd:
+        name: elasticsearch
+        state: restarted
+        daemon_reload: true
+      listen: "els restart"
+
+    - name: "Wait until elastic is up and running"
+      uri:
+        url: "http://{{ ansible_host }}:9200/_cluster/health?pretty"
+        return_content: true
+        validate_certs: false
+        status_code: [200, 403]
+      register: uri_output
+      until: uri_output.status in [200, 403]
+      retries: 15
+      delay: 5  # seconds
+      listen: "els restart"
+  when: not ansible_check_mode

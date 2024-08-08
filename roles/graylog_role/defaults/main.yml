@@ -1,0 +1,17 @@
+---
+graylog_major_version: "3.3"
+graylog_repository_centos: "https://packages.graylog2.org/repo/packages/graylog-{{ graylog_major_version }}-repository_latest.rpm"
+graylog_repository_debian: "https://packages.graylog2.org/repo/packages/graylog-{{ graylog_major_version }}-repository_latest.deb"
+graylog_packages:
+  - "graylog-server"
+  - "graylog-enterprise-plugins"
+  - "graylog-integrations-plugins"
+  - "graylog-enterprise-integrations-plugins"
+graylog_package_version: "3.3.17-1"
+graylog_cluster: false
+graylog_xms: "1g"
+graylog_xmx: "1g"
+graylog_listen_address: "0.0.0.0"
+graylog_listen_port: "9000"
+graylog_input_ports: []  # for graylog inputs
+graylog_allow_leading_wildcard_searches: false

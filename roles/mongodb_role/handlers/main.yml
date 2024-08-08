@@ -1,0 +1,14 @@
+---
+- name: mongod restart
+  systemd:
+    name: mongod
+    state: restarted
+    daemon-reload: true
+  when: not ansible_check_mode
+
+- name: mongodb_exporter restart
+  systemd:
+    name: mongodb_exporter
+    state: restarted
+    daemon-reload: true
+  when: not ansible_check_mode

@@ -1,0 +1,53 @@
+---
+all:
+  children:
+    infra_service_ha_logging_system:
+      children:
+        infra_service_ha_logging_system_elasticsearch_nodes:
+          hosts:
+            prd-ops-els101:
+              elasticsearch_cold_storage_node: false
+            prd-ops-els201:
+              elasticsearch_cold_storage_node: false
+            prd-ops-els301:
+              elasticsearch_cold_storage_node: false
+            prd-ops-els102:
+              elasticsearch_cold_storage_node: true
+            prd-ops-els202:
+              elasticsearch_cold_storage_node: true
+            prd-ops-els302:
+              elasticsearch_cold_storage_node: true
+        infra_service_ha_logging_system_graylog_master_nodes:
+          hosts:
+            prd-ops-glg102:
+              graylog_cluster_master: true
+        infra_service_ha_logging_system_graylog_worker_nodes:
+          hosts:
+            prd-ops-glg101:
+              mongodb_rs_master: false
+              graylog_cluster_master: false
+            prd-ops-glg103:
+              mongodb_rs_master: false
+              graylog_cluster_master: false
+            prd-ops-glg201:
+              mongodb_rs_master: true
+              graylog_cluster_master: false
+            prd-ops-glg301:
+              mongodb_rs_master: false
+              graylog_cluster_master: false
+
+    infra_service_haproxy_anycast:
+      children:
+        infra_service_haproxy_anycast_prod:
+          hosts:
+            prd-ops-blr101:
+            prd-ops-blr102:
+            prd-ops-blr201:
+            prd-ops-blr202:
+            prd-ops-blr301:
+            prd-ops-blr302:
+        infra_service_haproxy_anycast_test:
+          hosts:
+            tst-ops-blr101:
+            tst-ops-blr201:
+            tst-ops-blr301:

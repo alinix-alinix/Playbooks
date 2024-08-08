@@ -1,0 +1,44 @@
+---
+- name: lookup ssh key for "{{ item }}"
+  set_fact:
+    ssh_details:
+      username: "{{ item }}"
+      pub_ssh_keys: "{{ lookup('url', 'https://gitlab.local/{}.keys'
+        .format(item),split_lines=false) }}"
+  delegate_to: localhost
+  run_once: true
+  tags:
+    - access
+
+- name: added group "{{ item }}"
+  group:
+    name: "{{ item }}"
+  tags:
+    - access
+  when:
+    - item not in getent_group
+
+- name: added "{{ item }}"
+  user:
+    name: "{{ item }}"
+    shell: /bin/bash
+    create_home: true
+    groups: "{{ sudo_group }}, {{ item }}"
+    group: "{{ item }}"
+    password: ""
+    state: present
+  when:
+    - item not in getent_passwd
+  tags:
+    - access
+
+- name: added ssh key for {{ ssh_details.username }}
+  authorized_key:
+    user: "{{ ssh_details.username }}"
+    state: present
+    manage_dir: true
+    key: "{{ ssh_details.pub_ssh_keys }}"
+    exclusive: true
+  tags:
+    - access
+  ignore_errors: "{{ ansible_check_mode }}"

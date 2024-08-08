@@ -1,0 +1,10 @@
+---
+bash_log_dir: /var/log/bash
+bash_log_path: "{{ bash_log_dir }}/shell.log"
+rsyslog_verify_config: "/usr/sbin/rsyslogd -f %s -N 1"
+logrotate_verify_config: "/usr/sbin/logrotate -d %s"
+shellcheck_validate: "/usr/bin/shellcheck --shell=bash %s"
+
+init_default_nameservers:
+  - 10.10.10.10
+  - 10.10.11.11

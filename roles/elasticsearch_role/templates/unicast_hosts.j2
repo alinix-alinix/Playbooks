@@ -1,0 +1,7 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+{% for fqdn in ansible_play_hosts %}
+{{ lookup('dig', fqdn) }}:9300
+{% endfor %}

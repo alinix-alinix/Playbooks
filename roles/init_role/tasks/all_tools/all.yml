@@ -1,0 +1,136 @@
+---
+- name: include role epel-release-role
+  include_role:
+    name: epel-release-role
+  when:
+    - ansible_facts.packages is not search 'epel-release'
+    - ansible_facts.os_family == 'RedHat'
+    - not ansible_distribution == 'OracleLinux'
+
+- name: install oracle-epel-release
+  yum:
+    name: oracle-epel-release-el8
+    state: present
+  when:
+    - ansible_distribution == 'OracleLinux'
+    - ansible_distribution_major_version == '8'
+
+- name: get package facts after install epel-release
+  meta: flush_handlers
+
+- name: install all def package for Centos
+  yum:
+    name:
+      - tmux
+      - htop
+      - iputils
+      - bind-utils
+      - net-tools
+      - unzip
+      - pigz
+      - nscd
+      - bash-completion
+      - bash-completion-extras
+      - iftop
+      - sysstat
+      - wget
+      - curl
+      - nano
+      - vim
+      - ansible
+      - bmon
+      - nload
+      - nc
+      - ShellCheck
+      - colordiff
+      - parted
+    state: present
+  when:
+    - ansible_facts.packages is search 'epel-release'
+    - ansible_facts.packages is defined
+    - not ansible_distribution == 'OracleLinux'
+  notify: get package facts
+  tags:
+    - tools
+
+- name: install all def package for Oracle
+  yum:
+    name:
+      - tmux
+      - htop
+      - iputils
+      - bind-utils
+      - net-tools
+      - unzip
+      - pigz
+      - nscd
+      - bash-completion
+      - iftop
+      - sysstat
+      - wget
+      - curl
+      - nano
+      - vim
+      - ansible
+      - bmon
+      - nload
+      - nc
+      - ShellCheck
+      - colordiff
+      - parted
+    state: present
+  when:
+    - ansible_distribution == 'OracleLinux'
+    - ansible_facts.packages is search 'oracle-epel-release-el8'
+    - ansible_facts.packages is defined
+  notify: get package facts
+  tags:
+    - tools
+
+- name: install all def package for Debian
+  apt:
+    name:
+      - tmux
+      - htop
+      - dnsutils
+      - net-tools
+      - unzip
+      - pigz
+      - nscd
+      - bash-completion
+      - iftop
+      - sysstat
+      - wget
+      - curl
+      - nano
+      - vim
+      - ansible
+      - bmon
+      - nload
+      - netcat
+      - locales-all
+      - shellcheck
+      - parted
+      - acl  # https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_privilege_escalation.html#risks-of-becoming-an-unprivileged-user
+      - xfsprogs  # In case you need to create xfs filesystem
+    state: present
+  when:
+    - ansible_facts.packages is defined
+    - ansible_facts.os_family == 'Debian'
+  notify: get package facts
+  tags:
+    - tools
+
+- name: get package facts after install all def package
+  meta: flush_handlers
+
+- name: enabled nscd
+  service:
+    name: nscd
+    state: started
+    enabled: true
+  when:
+    - ansible_facts.packages is search 'nscd'
+    - ansible_facts.packages is defined
+  tags:
+    - tools

@@ -1,0 +1,90 @@
+---
+- name: getting facts
+  include_tasks: get-facts-variables.yml
+
+- name: "java deployment"
+  include_role:
+    name: java-role
+
+- name: elastic for centos
+  include_tasks:
+    elasticsearch-cent.yml
+  when:
+    - ansible_facts.os_family == "RedHat"
+    - ansible_facts.packages is not search 'elastic'
+    - ansible_facts.packages is defined
+    - elasticsearch_version is defined
+    - not ansible_check_mode
+
+- name: elastic for debian
+  include_tasks:
+    elasticsearch-deb.yml
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - ansible_facts.packages is not search 'elastic'
+    - ansible_facts.packages is defined
+    - elasticsearch_version is defined
+    - not ansible_check_mode
+
+- name: "elasticsearch configs"
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/elasticsearch/{{ item }}"
+    owner: "{{ elasticsearch_user }}"
+    group: "{{ elasticsearch_group }}"
+    mode: 0644
+  loop:
+    - elasticsearch.yml
+    - jvm.options
+  notify: els restart
+
+- name: "create elasticsearch discovery file folder"
+  file:
+    path: /etc/elasticsearch/discovery-file
+    state: directory
+    owner: "{{ elasticsearch_user }}"
+    group: "{{ elasticsearch_group }}"
+    mode: 0755
+  notify: els restart
+  when: elasticsearch_cluster
+
+- name: "elasticsearch discovery file"
+  template:
+    src: "unicast_hosts.j2"
+    dest: "/etc/elasticsearch/discovery-file/unicast_hosts.txt"
+    owner: "{{ elasticsearch_user }}"
+    group: "{{ elasticsearch_group }}"
+    mode: 0644
+  notify: els restart
+  when: elasticsearch_cluster
+
+- name: put elasticsearch-exporter binary to its place
+  get_url:
+    url: "{{ elasticsearch_repository }}/elasticsearch_exporter"
+    dest: /usr/local/bin/elasticsearch_exporter
+    mode: 0755
+
+- name: template elasticsearch_exporter systemd unit
+  template:
+    src: elasticsearch-exporter.service.j2
+    dest: /etc/systemd/system/elasticsearch-exporter.service
+    mode: 0644
+  notify: els restart
+
+- name: "start services"
+  systemd:
+    service: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - elasticsearch.service
+    - elasticsearch-exporter.service
+
+- name: "firewall-ports"
+  vars:
+    firewalld_ports:
+      - '{{ elasticsearch_http_port }}/tcp'
+      - '{{ elasticsearch_transport_port }}/tcp'
+      - '9114/tcp'  # elasticsearch_exporter
+  include_role:
+    name: firewalld_role

@@ -1,0 +1,88 @@
+---
+- name: getting facts
+  include_tasks: get-facts-variables.yml
+
+- name: deploy mongodb on centos
+  yum:
+    name: "{{ mongodb_repository }}/{{ item }}-1.el7.x86_64.rpm"
+    state: installed
+  loop: "{{ mongodb_files }}"
+  when:
+    - not ansible_check_mode
+    - ansible_facts.os_family == "RedHat"
+
+- name: deploy mongodb on debian
+  apt:
+    deb: "{{ mongodb_repository }}/{{ item }}-amd64.deb"
+    state: present
+  loop: "{{ mongodb_files }}"
+  when:
+    - not ansible_check_mode
+    - ansible_facts.os_family == "Debian"
+
+- name: template config
+  template:
+    src: mongod.conf
+    dest: /etc/mongod.conf
+    mode: 0644
+    owner: "{{ mongodb_username }}"
+    group: "{{ mongodb_username }}"
+  notify: mongod restart
+
+- name: install mongodb_exporter for debian
+  apt:
+    deb: "{{ mognodb_exporter_repo }}.deb"
+    state: present
+  when:
+    - not ansible_check_mode
+    - ansible_facts.os_family == "Debian"
+
+- name: install mongodb_exporter for centos
+  apt:
+    deb: "{{ mognodb_exporter_repo }}.rpm"
+    state: present
+  when:
+    - not ansible_check_mode
+    - ansible_facts.os_family == "RedHat"
+
+- name: templating mongodb systemd unit
+  template:
+    src: "mongod.service.j2"
+    dest: "/etc/systemd/system/mongod.service"
+    mode: 0644
+  notify:
+    - mongod restart
+
+- name: templating mongodb_exporter config
+  template:
+    src: "mongodb_exporter.j2"
+    dest: "/etc/default/mongodb_exporter"
+    mode: 0644
+    owner: "{{ mongodb_exporter_user }}"
+  notify:
+    - mongodb_exporter restart
+
+- name: start services
+  systemd:
+    service: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - "mongod.service"
+    - "mongodb_exporter.service"
+  when: not ansible_check_mode
+
+- name: mongodb firewall port
+  vars:
+    firewalld_ports:
+      - "{{ mongodb_listen_port }}/tcp"
+      - "{{ mongodb_exporter_listen_port }}/tcp"
+  include_role:
+    name: firewalld_role
+
+- name: setup repica set, if certain flags are set
+  include_tasks: replica_set.yml
+  tags: replset
+  when:
+    - mongodb_setup_replica_set
+    - mongodb_replicaset_name|length > 0

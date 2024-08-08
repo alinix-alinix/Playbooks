@@ -1,0 +1,9 @@
+---
+- name: enable fstrim.timer
+  systemd:
+    name: fstrim.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+  # check enabled discard block ssd device. if enabled (!= 0) then enable fstrim time
+  when: ansible_devices | dict2items | selectattr('key', 'match', '^sd.*|^nvme.*') | selectattr('value.support_discard', '!=', '0' ) != []

@@ -52,7 +52,7 @@
 
 - name: deploy haproxy exporter
   get_url:
-    url: "https://store.petcorp.ru/H/haproxy_exporter"
+    url: "https://store.local/H/haproxy_exporter"
     dest: "{{ haproxy_exporter_bin_folder }}/haproxy_exporter"
     mode: 0755
 

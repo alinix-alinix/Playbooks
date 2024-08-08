@@ -1,0 +1,41 @@
+---
+- name: set facts for RedHat
+  set_fact:
+    sudo_group: "{{ os_network_sudo_group }}"
+    dir_extra_option: '/etc/sysconfig'
+  when:
+    - ansible_facts.os_family == 'RedHat'
+  tags:
+    - access
+    - ci
+
+- name: set facts for Debian
+  set_fact:
+    sudo_group: "{{ os_network_sudo_group }}"
+    dir_extra_option: '/etc/default'
+  when:
+    - ansible_facts.os_family == 'Debian'
+  tags:
+    - access
+    - ci
+
+- name: get all package facts
+  package_facts:
+    manager: auto
+  tags:
+    - access
+    - ci
+
+- name: get users
+  getent:
+    database: passwd
+  tags:
+    - access
+    - ci
+
+- name: get group
+  getent:
+    database: group
+  tags:
+    - access
+    - ci

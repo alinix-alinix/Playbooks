@@ -36,7 +36,7 @@
   template:
     src: bird.conf.j2
     dest: /etc/bird.conf
-    validate: /sbin/bird -p -c %s
+    validate: /sbin/bird -pc %s
     owner: root
     group: "{{ anycast_service_group_name|default('bird') }}"
     mode: 0644

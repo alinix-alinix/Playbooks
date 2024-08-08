@@ -1,0 +1,4 @@
+---
+- name: adds tools for {{ item }}
+  include_tasks:
+    users_tools/default.yml

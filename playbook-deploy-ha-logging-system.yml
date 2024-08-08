@@ -1,0 +1,136 @@
+---
+- name: init-role
+  gather_facts: true
+  hosts: infra_service_ha_logging_system
+  become: true
+  roles:
+    - init_role
+  pre_tasks:
+    - name: Lookup token for access to vault
+      set_fact:
+        vault_access_token: "{{ lookup('env', 'VAULT_TOKEN_PERSONAL') }}"
+      tags:
+        - always
+
+    - name: Fail if token not defined
+      fail:
+        msg: 'This playbook uses hashicorp vault lookup.
+          Please specify environment variable $VAULT_TOKEN_PERSONAL, see link for more info
+          https://www.vaultproject.io/docs/commands/token/lookup'
+      when: vault_access_token | length == 0
+      tags:
+        - always
+  strategy: free
+
+- name: setup elastic on corresponding nodes
+  gather_facts: true
+  hosts: infra_service_ha_logging_system_elasticsearch_nodes
+  become: true
+  roles:
+    - elasticsearch_role
+  vars:
+    java_version: "8u301"
+    elasticsearch_cluster: true
+    elasticsearch_cluster_name: "graylog"
+    elasticsearch_xms: "4g"
+    elasticsearch_xmx: "4g"
+  tags:
+    - elastic
+  serial:
+    - 1
+
+- name: setup java and graylog on graylog master node
+  gather_facts: true
+  hosts: infra_service_ha_logging_system_graylog_master_nodes
+  become: true
+  roles:
+    - graylog_role
+  vars:
+    java_version: "8u301"
+    graylog_major_version: "3.3"
+    graylog_cluster: true
+    graylog_elasticsearch_hosts:
+      "http://prd-ops-els101:9200,\
+      http://prd-ops-els201:9200,\
+      http://prd-ops-els301:9200,\
+      http://prd-ops-els102:9200,\
+      http://prd-ops-els202:9200,\
+      http://prd-ops-els302:9200"
+    graylog_mongodb_uri:
+      "mongodb://prd-ops-glg201:27017,\
+      prd-ops-glg101:27017,\
+      prd-ops-glg301:27017/graylog?replicaSet=rs0"
+    graylog_xms: "2g"
+    graylog_xmx: "2g"
+    graylog_allow_leading_wildcard_searches: true
+  tags:
+    - graylog
+  strategy: linear
+
+- name: setup java, mongodb, mongodb replica set, anycast on graylog worker nodes
+  gather_facts: true
+  hosts: infra_service_ha_logging_system_graylog_worker_nodes
+  become: true
+  roles:
+    - mongodb_role
+    - graylog_role
+    - anycast_role
+  vars:
+    java_version: "8u301"
+    mongodb_setup_replica_set: true
+    mongodb_replicaset_name: "rs0"
+    graylog_major_version: "3.3"
+    graylog_cluster: true
+    graylog_elasticsearch_hosts:
+      "http://prd-ops-els101:9200,\
+      http://prd-ops-els201:9200,\
+      http://prd-ops-els301:9200,\
+      http://prd-ops-els102:9200,\
+      http://prd-ops-els202:9200,\
+      http://prd-ops-els302:9200"
+    graylog_mongodb_uri:
+      "mongodb://prd-ops-glg201:27017,\
+      prd-ops-glg101:27017,\
+      prd-ops-glg301:27017/graylog?replicaSet=rs0"
+    graylog_trusted_proxies:
+      - prd-ops-blr101
+      - prd-ops-blr102
+      - prd-ops-blr201
+      - prd-ops-blr202
+      - prd-ops-blr301
+      - prd-ops-blr302
+    graylog_xms: "3g"
+    graylog_xmx: "3g"
+    graylog_processbuffer_processors: 12
+    graylog_outputbuffer_processors: 2
+    graylog_allow_leading_wildcard_searches: true
+    graylog_input_ports:  # inputs:
+      - '5003/udp'  # k3s gelf udp
+      - '5044/tcp'  # beats
+      - '5081/udp'  # kube-gelf-01 gelf udp
+      - '5443/udp'  # web rsyslog Raw/Plaintext UDP
+      - '5656/udp'  # driver app
+      - '5748/udp'  # web department docker nodejs GELF UDP
+      - '5749/udp'  # petshopru gelf udp
+      - '7708/udp'  # java GELF endpoint
+      - '7710/udp'  # web app json gelf udp
+      - '7791/udp'  # web dep nginx error udp
+      - '7799/udp'  # syslog UDP web
+      - '9514/udp'  # rsyslog graylog-networking
+      - '12201/tcp'  # web deploy
+    anycast_ip: "10.10.10.101"  # graylog inputs anycast address
+    anycast_ospf_area_auto: true
+    anycast_leader_service: "graylog-server"
+    anycast_leader_service_delay: 60
+    anycast_ospf_auth_key: "{{ lookup('hashi_vault', 'secret=infra/data/noc/routers/mikrotik/ospf/{}
+              mount_point=secrets token={} url=https://vault/'.format('service_zones_md5',vault_access_token)).password }}"
+    anycast_ospf_auth_key_id: "5"
+    anycast_ospf_interface_cost: 10
+    anycast_ospf_interface_priority: 1
+    anycast_service_user_name: "graylog"
+    anycast_service_group_name: "graylog"
+  tags:
+    - graylog
+  serial:
+    - 1
+    - 100%

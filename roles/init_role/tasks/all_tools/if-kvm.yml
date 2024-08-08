@@ -1,0 +1,7 @@
+---
+- name: install VM KVM packages
+  package:
+    name:
+      - qemu-guest-agent
+      - cloud-utils
+    state: present

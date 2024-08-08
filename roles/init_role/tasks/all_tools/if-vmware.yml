@@ -1,0 +1,7 @@
+---
+- name: install VMWare packages
+  package:
+    name:
+      - open-vm-tools
+      - cloud-utils
+    state: present

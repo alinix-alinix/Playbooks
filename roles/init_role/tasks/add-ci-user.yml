@@ -1,0 +1,32 @@
+---
+- name: added group ansible
+  group:
+    name: ansible
+  when:
+    - "'ansible' not in getent_passwd"
+  tags:
+    - access
+    - ci
+
+- name: added user ansible
+  user:
+    name: ansible
+    groups: "{{ sudo_group }}, ansible"
+    password: ""
+    state: present
+  when:
+    - "'ansible' not in getent_passwd"
+  tags:
+    - access
+    - ci
+
+- name: added ssh key for ansible
+  authorized_key:
+    user: ansible
+    state: present
+    manage_dir: true
+    key: ssh-ed25519 some_key
+  tags:
+    - access
+    - ci
+  ignore_errors: "{{ ansible_check_mode }}"

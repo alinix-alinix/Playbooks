@@ -1,0 +1,57 @@
+---
+- name: get variables
+  include_tasks:
+    get-facts-variables.yml
+
+- name: install logrotate
+  package:
+    name: logrotate
+    state: installed
+  when:
+    - ansible_facts.packages is not search 'logrotate'
+    - ansible_facts.packages is defined
+
+- name: checking necessary fields
+  fail:
+    msg: "Values of important variables values are incorrect: please check logrotate_filename and logrotate_period"
+  when:
+    logrotate_filename | length == 0
+    or
+    logrotate_period not in logrotate_available_periods
+
+- name: logrotate settings if filename was set.
+  block:
+    - name: Template logrotate rule
+      template:
+        src: "logrotate.j2"
+        dest: "{{ logrotate_folder }}/{{ logrotate_filename }}"
+        mode: 0644
+        validate: /usr/sbin/logrotate -d %s
+
+    - name: template logrotate units
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dst }}"
+        owner: root
+        mode: 0644
+      loop:
+        - {src: "logrotate.service.j2", dst: "{{ logrotate_systemd_unit_path }}"}
+        - {src: "logrotate-hourly.timer.j2", dst: "{{ logrotate_hourly_timer_path }}"}
+      when:
+        - logrotate_period == "hourly"
+
+    - name: ensure logrotate units are alive
+      systemd:
+        daemon_reload: true
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - "logrotate.service"
+        - "logrotate-hourly.timer"
+      when:
+        - logrotate_period == "hourly"
+      ignore_errors: "{{ ansible_check_mode }}"
+
+  when:
+    - logrotate_filename | length > 0

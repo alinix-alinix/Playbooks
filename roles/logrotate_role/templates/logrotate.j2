@@ -1,0 +1,47 @@
+#jinja2:lstrip_blocks: True
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+
+{% for tasks in logrotate_task_list %}
+{% if tasks.log_file_mask is defined and tasks.log_file_mask | length >0 %}
+{{ tasks.log_file_mask }} {
+{% if tasks.switch_user is defined %}
+  su {{ tasks.switch_user }} {{ tasks.switch_user }}
+{% endif %}
+{% if tasks.copytruncate is defined and tasks.copytruncate %}
+  copytruncate
+{% endif %}
+{% if tasks.nocreate is defined and tasks.nocreate %}
+  nocreate
+{% endif %}
+  {{ logrotate_period }}
+{% if logrotate_period == "hourly" -%}
+  rotate {{ logrotate_retention_days*24 }}
+{% else %}
+  rotate {{ logrotate_retention_days }}
+{%- endif -%}
+{% if tasks.notifempty is defined and tasks.notifempty %}  
+  notifempty
+{%- endif -%}
+{% if tasks.compress is defined and tasks.compress %}  
+  compress
+{%- endif -%}
+{% if tasks.missingok is defined and tasks.missingok %}  
+  missingok
+{%- endif -%}
+{% if tasks.delaycompress is defined and tasks.delaycompress %}  
+  delaycompress
+{%- endif -%}
+{% if (tasks.postrotate is defined and tasks.postrotate) and tasks.postrotate_script is defined %}  
+  sharedscripts
+  postrotate
+    {{ tasks.postrotate_script }}
+  endscript
+}
+{% else %}
+
+}
+{% endif %}
+{% endif %}
+{% endfor %}

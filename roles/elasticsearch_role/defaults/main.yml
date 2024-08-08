@@ -1,0 +1,17 @@
+---
+elasticsearch_version: "6.8.23"
+elasticsearch_cluster: false
+elasticsearch_repository: "https://store.host.local/E/elasticsearch"
+elasticsearch_xms: "2g"
+elasticsearch_xmx: "2g"
+elasticsearch_user: "elasticsearch"
+elasticsearch_group: "elasticsearch"
+elasticsearch_http_port: "9200"
+elasticsearch_transport_port: "9300"
+elasticsearch_data_path: "/var/lib/elasticsearch"
+elasticsearch_log_path: "/var/log/elasticsearch"
+
+elasticsearch_disk_thresholds_enabled: true
+elasticsearch_disk_watermark_flood_stage: "5gb"
+elasticsearch_disk_watermark_low: "6gb"
+elasticsearch_disk_watermark_high: "5gb"

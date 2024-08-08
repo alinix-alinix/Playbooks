@@ -5,15 +5,20 @@
 [Unit]
 Description=BIRD Internet Routing Daemon
 Documentation=http://bird.network.cz/
+{% if anycast_leader_service|length > 0 %}
 After={{ anycast_leader_service }}.service
 BindsTo={{ anycast_leader_service }}.service
+{% endif %}
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/bird -f -u {{ birdusername|default('bird') }} -g {{ birdgroup|default('bird') }} -c /etc/bird.conf
+ExecStart=/usr/sbin/bird -f -u {{ anycast_service_user_name|default('bird') }} -g {{ anycast_service_group_name|default('bird') }} -c /etc/bird.conf
 ExecReload=/bin/kill -HUP $MAINPID
+ExecStartPre=/bin/sleep {{ anycast_leader_service_delay }}
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
+{% if anycast_leader_service|length > 0 %}
 WantedBy={{ anycast_leader_service }}.service
+{% endif %}

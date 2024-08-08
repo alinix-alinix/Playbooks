@@ -21,7 +21,7 @@
 
     - name: Install nullfs package
       apt:
-        deb: https://store.petcorp.ru/N/nullfsvfs_0.17_amd64.deb
+        deb: https://store.local/N/nullfsvfs_0.17_amd64.deb
         state: present
       register: nullfs_install
 

@@ -1,0 +1,108 @@
+---
+- name: get facts
+  include_tasks:
+    get-facts-variables.yml
+  tags:
+    - access
+    - ci
+
+- name: install required settings
+  include_tasks:
+    required_settings/all.yml
+
+- name: add fstrim timer
+  include_tasks:
+    required_settings/fstrim.yml
+
+- name: include selinux-role
+  include_role:
+    name: selinux-role
+  when:
+    - ansible_selinux.status == "enabled"
+    - ansible_facts.os_family == "RedHat"
+
+- name: fixed sudoers
+  include_tasks:
+    fixed-sudoers.yml
+  tags:
+    - access
+
+- name: add ci user
+  include_tasks:
+    add-ci-user.yml
+  tags:
+    - ci
+
+- name: adds users
+  include_tasks:
+    add-admin-users.yml
+  loop:
+    - s.stepanov
+  tags:
+    - access
+
+- name: sshd tweaks PermitRootLogin
+  lineinfile:
+    state: present
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    validate: "/usr/sbin/sshd -t -f %s"
+  loop:
+    - {line: 'PermitRootLogin prohibit-password', regexp: '^PermitRootLogin|#PermitRootLogin|# PermitRootLogin'}
+  notify:
+    - reload sshd
+  tags:
+    - access
+
+- name: add default home for {{ item }}
+  include_tasks:
+    set-def-users-home.yml
+  loop:
+    - s.stepanov
+  tags:
+    - access
+
+- name: add all system tools
+  include_tasks:
+    all_tools/all.yml
+
+- name: include role fail2ban
+  include_role:
+    name: fail2ban-role
+
+- name: include atop_role
+  include_role:
+    name: atop_role
+
+- name: setup bash logging
+  include_tasks:
+    bash-logging.yml
+
+- name: add node-exporter
+  include_role:
+    name: node_exporter_role
+    apply:
+      tags:
+        - node_exporter_install
+  tags: install_node_exporter
+
+- name: HW install tools
+  include_tasks:
+    all_tools/if-hw.yml
+  when:
+    - ansible_facts.virtualization_role != 'guest'
+
+- name: VMware install tools
+  include_tasks:
+    all_tools/if-vmware.yml
+  when:
+    - ansible_facts.virtualization_type == 'VMware'
+    - ansible_facts.virtualization_role == 'guest'
+
+- name: kvm install tools
+  include_tasks:
+    all_tools/if-kvm.yml
+  when:
+    - ansible_facts.virtualization_type == 'kvm'
+    - ansible_facts.virtualization_role == 'guest'

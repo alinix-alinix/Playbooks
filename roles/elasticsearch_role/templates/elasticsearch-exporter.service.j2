@@ -1,0 +1,15 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+[Unit]
+Description=elasticsearch-exporter for prometheus
+After=network.target
+
+[Service]
+Type=simple
+User=elasticsearch
+ExecStart=/usr/local/bin/elasticsearch_exporter --es.uri=http://{{ lookup('dig', ansible_host) }}:9200
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+---
+- name: install HW package
+  package:
+    name:
+      - lldpd
+      - ipmitool
+      - smartmontools
+      - lshw
+      - stress
+      - "{{ os_lm_sensors_package_name }}"
+    state: present
+  tags:
+    - tools
+
+- name: enabled lldpd
+  service:
+    name: lldpd
+    state: started
+    enabled: true
+  tags:
+    - tools
+  ignore_errors: "{{ ansible_check_mode }}"

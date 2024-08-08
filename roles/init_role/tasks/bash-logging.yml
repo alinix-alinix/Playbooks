@@ -1,0 +1,39 @@
+---
+- name: Enable bash logging
+  template:
+    src: bash_logging.sh.j2
+    dest: /etc/profile.d/bash_logging.sh
+    mode: 0644
+    validate: "{{ shellcheck_validate }}"
+
+- name: Add settings to rsyslog
+  template:
+    src: bash_logging.conf.j2
+    dest: /etc/rsyslog.d/bash_logging.conf
+    mode: 0644
+    validate: "{{ rsyslog_verify_config }}"
+  notify:
+    - restart rsyslog
+
+- name: Create directory for log files
+  file:
+    state: directory
+    path: "{{ bash_log_dir }}"
+    group: "{{ sudo_group }}"
+    mode: 0640
+
+- name: Create log file
+  file:
+    state: touch
+    path: "{{ bash_log_path }}"
+    group: "{{ sudo_group }}"
+    mode: 0640
+    modification_time: preserve
+    access_time: preserve
+
+- name: Add logrotate for "{{ bash_log_path }}"
+  template:
+    src: bash_logging.j2
+    dest: /etc/logrotate.d/bash_logging
+    mode: 0644
+    validate: "{{ logrotate_verify_config }}"

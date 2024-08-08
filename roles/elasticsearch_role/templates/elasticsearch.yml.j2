@@ -1,0 +1,31 @@
+---
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+cluster.name: {{ elasticsearch_cluster_name }}
+node.name: {{ ansible_hostname }}
+http.port: {{ elasticsearch_http_port }}
+transport.tcp.port: {{ elasticsearch_transport_port }}
+path.data: {{ elasticsearch_data_path }}
+path.logs: {{ elasticsearch_log_path }}
+network.host: {{ elasticsearch_listen_address|default(lookup('dig', ansible_host)) }}
+{% if elasticsearch_cluster %}
+# cluster options
+node.master: true
+node.data: true
+discovery.zen.hosts_provider: file  # unicast_hosts
+discovery.zen.minimum_master_nodes: 2
+# data tier options:
+{% if elasticsearch_cold_storage_node is defined and elasticsearch_cold_storage_node %}
+node.attr.boxtype: cold
+{%else%}
+node.attr.boxtype: hot
+{% endif %}
+{% endif %}
+{% if elasticsearch_disk_thresholds_enabled %}
+# disk thresholds options
+cluster.routing.allocation.disk.threshold_enabled: {{ elasticsearch_disk_thresholds_enabled }}
+cluster.routing.allocation.disk.watermark.flood_stage: {{ elasticsearch_disk_watermark_flood_stage }}
+cluster.routing.allocation.disk.watermark.low: {{ elasticsearch_disk_watermark_low }}
+cluster.routing.allocation.disk.watermark.high: {{ elasticsearch_disk_watermark_high }} 
+{% endif %}

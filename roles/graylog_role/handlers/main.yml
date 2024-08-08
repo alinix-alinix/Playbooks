@@ -1,0 +1,23 @@
+---
+- name: "graylog restart - Block"
+  block:
+    - name: "graylog service restart"
+      systemd:
+        name: graylog-server
+        state: restarted
+        daemon-reload: true
+        enabled: true
+      listen: "graylog restart"
+
+    - name: "Wait until graylog is up and running"
+      uri:
+        url: "http://{{ ansible_host }}:9000/api/system/lbstatus"
+        return_content: true
+        validate_certs: false
+        status_code: [200, 403]
+      register: uri_output
+      until: uri_output.status in [200, 403]
+      retries: 15
+      delay: 5  # seconds
+      listen: "graylog restart"
+  when: not ansible_check_mode

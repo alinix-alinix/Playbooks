@@ -1,0 +1,568 @@
+---
+- name: init_role
+  gather_facts: true
+  hosts: infra_service_haproxy_anycast
+  become: true
+  roles:
+    - init_role
+    - certificates_role
+  vars:
+    only_copy: true
+    domains:
+      - "domain1"
+      - "domain2"
+  pre_tasks:
+    - name: Lookup token for access to vault
+      set_fact:
+        vault_access_token: "{{ lookup('env', 'VAULT_TOKEN_PERSONAL') }}"
+      tags:
+        - always
+    - name: Fail if token not defined
+      fail:
+        msg: 'This playbook uses hashicorp vault lookup.
+          Please specify environment variable $VAULT_TOKEN_PERSONAL, see link for more info
+          https://www.vaultproject.io/docs/commands/token/lookup'
+      when: vault_access_token | length == 0
+      tags:
+        - always
+  strategy: free
+
+- name: Prepare test balancer nodes
+  gather_facts: true
+  hosts: infra_service_haproxy_anycast_test
+  become: true
+  vars:
+    anycast_ip: "10.0.0.1"
+    anycast_ospf_interface_cost: 10
+    anycast_ospf_interface_priority: 1
+    anycast_ospf_auth_key: "{{ lookup('hashi_vault', 'secret=infra/data/noc/routers/mikrotik/ospf/{}
+              mount_point=secrets token={} url=https://vault/'.format('service_zones_md5',vault_access_token)).password }}"
+    anycast_ospf_auth_key_id: 5
+    anycast_ospf_area_auto: true
+    anycast_leader_service: "haproxy"
+    haproxy_version: "2.7.6"  # there is debian support
+    haproxy_stats_user: "admin"
+    haproxy_stats_password: "{{ lookup('hashi_vault', 'secret=infra/data/balancers/haproxy/anycast/test/stats/users/{}
+              mount_point=secrets token={} url=https://vault/'.format(haproxy_stats_user,vault_access_token)).password }}"
+    haproxy_extended_json_logging: true
+    haproxy_frontends:
+      - name: "stats"
+        system: true
+        bind: ":1936"
+        mode: "http"
+        options:
+          - name: "stats"
+            value: "enable"
+          - name: "stats realm"
+            value: "Haproxy\ Statistics"
+          - name: "stats uri"
+            value: "/stats"
+          - name: "stats refresh"
+            value: "10s"
+          - name: "stats admin"
+            value: "if TRUE"
+          - name: "stats auth"
+            value: "{{ haproxy_stats_user }}:{{ haproxy_stats_password }}"
+        acl: []
+        use_backend: []
+      - name: "health"
+        system: true
+        bind: "127.0.0.1:1937"
+        mode: "http"
+        options:
+          - name: "monitor-uri"
+            value: "/healthz"
+          - name: "option"
+            value: "dontlognull"
+        acl: []
+        use_backend: []
+      - name: "http_port_80"
+        system: false
+        bind: "{{ anycast_ip }}:80"
+        mode: "http"
+        options:
+          - name: "option"
+            value: "forwardfor"
+          - name: "http-request add-header X-Forwarded-Host"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Server"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Port"
+            value: "%[dst_port]"
+          - name: "http-request set-header X-Forwarded-Proto"
+            value: "http"
+        acl:
+          - name: "is_crm-test152"
+            criteria: "hdr(host) -i"
+            value: "crm-test152"
+          - name: "is_apicat-integration"
+            criteria: "hdr(host) -i"
+            value: "apicat-integration"
+          - name: "url_wpa"
+            criteria: "path_beg"
+            value: "/wpa/"
+          - name: "url_priceservice"
+            criteria: "path_beg"
+            value: "/priceservice/"
+        use_backend:
+          - name: "crm-test152"
+            criteria: "is_crm-test152"
+          - name: "apicat-integration"
+            criteria: "is_apicat-integration"
+          - name: "priceservice-web-test"
+            criteria: "url_priceservice"
+          - name: "wpa-test-web"
+            criteria: "url_wpa"
+      - name: "https_port_443"
+        system: false
+        bind: "{{ anycast_ip }}:443 ssl crt /etc/pki/web/wildcard1.pem crt /etc/pki/web/wildcard2.pem"
+        mode: "http"
+        options:
+          - name: "option"
+            value: "forwardfor"
+          - name: "http-request add-header X-Forwarded-Host"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Server"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Port"
+            value: "%[dst_port]"
+          - name: "http-request set-header X-Forwarded-Proto"
+            value: "https"
+        acl:
+          - name: "is_crm-test152"
+            criteria: "hdr(host) -i"
+            value: "crm-test152"
+          - name: "is_apicat-integration"
+            criteria: "hdr(host) -i"
+            value: "apicat-integration"
+          - name: "url_wpa"
+            criteria: "path_beg"
+            value: "/wpa/"
+          - name: "url_priceservice"
+            criteria: "path_beg"
+            value: "/priceservice/"
+        use_backend:
+          - name: "crm-test152"
+            criteria: "is_crm-test152"
+          - name: "apicat-integration"
+            criteria: "is_apicat-integration"
+          - name: "priceservice-web-test"
+            criteria: "url_priceservice"
+          - name: "wpa-test-web"
+            criteria: "url_wpa"
+    haproxy_backends:
+      - name: "apicat-integration"
+        balance_algorythm: "roundrobin"
+        options:
+          - name: "redirect scheme https"
+            value: "if !{ ssl_fc }"
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/gateway/health"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "dev-web-api301"
+            uri: "dev-web-api301:8080"
+            check: true
+      - name: "crm-test152"
+        balance_algorythm: "roundrobin"
+        options:
+          - name: "redirect scheme https"
+            value: "if !{ ssl_fc }"
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/CRM2/healthy"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "dev-web-crm301"
+            uri: "dev-web-crm301:8080"
+            check: true
+      - name: "priceservice-web-test"
+        balance_algorythm: "roundrobin"
+        weight_by_the_closest: true
+        weight_of_the_nearest_backend: 100
+        weight_of_the_far_backend: 5
+        options:
+          - name: "redirect scheme https"
+            value: "if !{ ssl_fc }"
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/priceservice/healthy"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "dev-web-prc303"
+            uri: "dev-web-prc303:8080"
+            check: true
+          - name: "dev-web-prc304"
+            uri: "dev-web-prc304:8080"
+            check: true
+      - name: "wpa-test-web"
+        balance_algorythm: "roundrobin"
+        weight_by_the_closest: true
+        weight_of_the_nearest_backend: 100
+        weight_of_the_far_backend: 5
+        options:
+          - name: "redirect scheme https"
+            value: "if !{ ssl_fc }"
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/wpa/healthy"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "dev-web-prc303"
+            uri: "dev-web-prc303:8080"
+            check: true
+          - name: "dev-web-prc304"
+            uri: "dev-web-prc304:8080"
+            check: true
+    firewalld_ports:  # all binds should be entered here
+      - '1936/tcp'
+      - '80/tcp'
+      - '81/tcp'
+      - '443/tcp'
+      - '9101/tcp'
+  roles:
+    - anycast_role  # it's first, because haproxy is about to be bound to the anycast address
+    - haproxy_role
+  pre_tasks:
+    - name: get service facts for further check
+      service_facts:
+      register: prerun_services
+  post_tasks:  # we´re not reenabling bird if leader_service was found on the host in pre_task
+    - name: disable bird service to establish child-parent relationship with haproxy
+      systemd:
+        name: "bird"
+        enabled: false
+      when:
+        - "prerun_services is not search anycast_leader_service"
+    - name: enable bird service to establish child-parent relationship with haproxy
+      systemd:
+        name: "bird"
+        enabled: true
+        state: "started"
+      when:
+        - "prerun_services is not search anycast_leader_service"
+  serial:
+    - 1
+    - 100%
+  tags: test
+
+- name: Prepare production balancer nodes
+  gather_facts: true
+  hosts: infra_service_haproxy_anycast_prod
+  become: true
+  vars:
+    anycast_ip: "10.0.0.100"
+    anycast_ospf_area_auto: true
+    anycast_ospf_interface_cost: 10
+    anycast_ospf_interface_priority: 1
+    anycast_ospf_auth_key: "{{ lookup('hashi_vault', 'secret=infra/data/noc/routers/mikrotik/ospf/{}
+              mount_point=secrets token={} url=https://vault/'.format('service_zones_md5',vault_access_token)).password }}"
+    anycast_ospf_auth_key_id: 5
+    anycast_leader_service: "haproxy"
+    haproxy_version: "2.8.3"
+    haproxy_stats_user: "admin"
+    haproxy_extended_json_logging: true
+    haproxy_stats_password: "{{ lookup('hashi_vault', 'secret=infra/data/balancers/haproxy/anycast/prod/stats/users/{}
+              mount_point=secrets token={} url=https://vault/'.format(haproxy_stats_user,vault_access_token)).password }}"
+    haproxy_frontends:
+      - name: "stats"
+        system: true
+        bind: ":1936"
+        mode: "http"
+        options:
+          - name: "stats"
+            value: "enable"
+          - name: "stats realm"
+            value: "Haproxy\ Statistics"
+          - name: "stats uri"
+            value: "/stats"
+          - name: "stats refresh"
+            value: "10s"
+          - name: "stats admin"
+            value: "if TRUE"
+          - name: "stats auth"
+            value: "{{ haproxy_stats_user }}:{{ haproxy_stats_password }}"
+        acl: []
+        use_backend: []
+      - name: "health"
+        system: true
+        bind: "127.0.0.1:1937"
+        mode: "http"
+        options:
+          - name: "monitor-uri"
+            value: "/healthz"
+          - name: "option"
+            value: "dontlognull"
+        acl: []
+        use_backend: []
+      - name: "http_port_80"
+        system: false
+        bind: "{{ anycast_ip }}:80"
+        mode: "http"
+        options:
+          - name: "option"
+            value: "forwardfor"
+          - name: "http-request add-header X-Forwarded-Host"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Server"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Port"
+            value: "%[dst_port]"
+        acl:
+          - name: "is_graylog"
+            criteria: "hdr(host) -i"
+            value: "graylog"
+          - name: "is_UserNotifierService"
+            criteria: "hdr(host) -i"
+            value: "uns"
+          - name: "is_crmlogger"
+            criteria: "hdr(host) -i"
+            value: "crmlogger"
+        use_backend:
+          - name: "graylog-web-ui"
+            criteria: "is_graylog"
+          - name: "UserNotifierService"
+            criteria: "is_UserNotifierService"
+      - name: "https_port_443"
+        system: false
+        bind: "{{ anycast_ip }}:443 ssl crt /etc/pki/web/wildcard1.pem crt /etc/pki/web/wildcard2.pem"
+        mode: "http"
+        options:
+          - name: "option"
+            value: "forwardfor"
+          - name: "http-request add-header X-Forwarded-Host"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Server"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Port"
+            value: "%[dst_port]"
+        acl:
+          - name: "is_apicat-web-internal"
+            criteria: "hdr(host) -i"
+            value: "apicat"
+          - name: "is_graylog"
+            criteria: "hdr(host) -i"
+            value: "graylog"
+          - name: "is_UserNotifierService"
+            criteria: "hdr(host) -i"
+            value: "uns"
+        use_backend:
+          - name: "apicat-web-internal"
+            criteria: "is_apicat-web-internal"
+          - name: "graylog-web-ui"
+            criteria: "is_graylog"
+          - name: "UserNotifierService"
+            criteria: "is_UserNotifierService"
+      - name: "graylog_elasticsearch_port_9200"
+        system: false
+        bind: "{{ anycast_ip }}:9200"
+        mode: "http"
+        options:
+          - name: "option"
+            value: "forwardfor"
+          - name: "http-request add-header X-Forwarded-Host"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Server"
+            value: "%[req.hdr(host)]"
+          - name: "http-request add-header X-Forwarded-Port"
+            value: "%[dst_port]"
+        acl: []
+        use_backend:
+          - name: "graylog_elasticsearch_nodes"
+            criteria: ""
+      - name: "beats_port_81"
+        system: false
+        bind: "{{ anycast_ip }}:81"
+        mode: "tcp"
+        options: []
+        acl: []
+        use_backend:
+          - name: "graylog_beats"
+            criteria: ""
+    haproxy_backends:
+      - name: "apicat-web-internal"
+        balance_algorythm: "roundrobin"
+        weight_by_the_closest: true
+        options:
+          - name: "redirect scheme https"
+            value: "if !{ ssl_fc }"
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/gateway/health"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "prd-jav-api301"
+            uri: "prd-jav-api301:8080"
+            check: true
+          - name: "prd-jav-api101"
+            uri: "prd-jav-api101:8080"
+            check: true
+      - name: "graylog_elasticsearch_nodes"
+        balance_algorythm: "roundrobin"
+        weight_by_the_closest: true
+        mode: "http"
+        options:
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/_cluster/health?pretty"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "prd-ops-els101"
+            uri: "prd-ops-els101:9200"
+            check: true
+          - name: "prd-ops-els201"
+            uri: "prd-ops-els201:9200"
+            check: true
+          - name: "prd-ops-els301"
+            uri: "prd-ops-els301:9200"
+            check: true
+      - name: graylog_beats
+        balance_algorythm: "roundrobin"
+        weight_by_the_closest: true
+        mode: "tcp"
+        options:
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check"
+            value: "send meth GET uri /api/system/lbstatus"
+          - name: "http-check expect rstring"
+            value: "^ALIVE"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "prd-ops-glg201"
+            uri: "prd-ops-glg201:5044"
+            check: true
+            check_port: 9000
+            inter: "2000"
+            on_marked_down: "shutdown-sessions"
+          - name: "prd-ops-glg101"
+            uri: "prd-ops-glg101:5044"
+            check: true
+            check_port: 9000
+            inter: "2000"
+            on_marked_down: "shutdown-sessions"
+          - name: "prd-ops-glg103"
+            uri: "prd-ops-glg103:5044"
+            check: true
+            check_port: 9000
+            inter: "2000"
+            on_marked_down: "shutdown-sessions"
+          - name: "prd-ops-glg301"
+            uri: "prd-ops-glg301:5044"
+            check: true
+            check_port: 9000
+            inter: "2000"
+            on_marked_down: "shutdown-sessions"
+      - name: "graylog-web-ui"
+        balance_algorythm: "roundrobin"  # по аналогии с имеющимся
+        weight_by_the_closest: true
+        options:
+          - name: "redirect scheme https"  # redirecting http->https
+            value: "if !{ ssl_fc }"
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check"
+            value: "send meth GET uri /api/system/lbstatus"
+          - name: "http-check expect rstring "
+            value: "^ALIVE"
+          - name: "http-check expect status"
+            value: "200"
+          - name: "http-request set-header X-Graylog-Server-URL"
+            value: "https://graylog"
+        forward:
+          - name: "prd-ops-glg201"
+            uri: "prd-ops-glg201:9000"
+            check: true
+          - name: "prd-ops-glg101"
+            uri: "prd-ops-glg101:9000"
+            check: true
+          - name: "prd-ops-glg103"
+            uri: "prd-ops-glg103:9000"
+            check: true
+          - name: "prd-ops-glg301"
+            uri: "prd-ops-glg301:9000"
+            check: true
+      - name: "UserNotifierService"
+        balance_algorythm: "roundrobin"
+        options:
+          - name: "option"
+            value: "httpchk"
+          - name: "http-check send meth GET uri"
+            value: "/userNotificationService/healthy"
+          - name: "http-check expect rstring"
+            value: "^Healthy"
+          - name: "http-check expect status"
+            value: "200"
+        forward:
+          - name: "prd-jav-uns201"
+            uri: "prd-jav-uns201:8080"
+            check: true
+    firewalld_ports:  # all binds should be entered here
+      - '1936/tcp'
+      - '80/tcp'
+      - '81/tcp'
+      - '443/tcp'
+      - '9101/tcp'
+      - '9200/tcp'
+  roles:
+    - haproxy_role
+    - anycast_role
+  pre_tasks:
+    - name: get service facts for further check
+      service_facts:
+      register: prerun_services
+  post_tasks:
+    - name: disable bird service to establish child-parent relationship with haproxy
+      systemd:
+        name: "bird"
+        enabled: false
+      when:
+        - "prerun_services is not search anycast_leader_service"
+    - name: enable bird service to establish child-parent relationship with haproxy
+      systemd:
+        name: "bird"
+        enabled: true
+        state: "started"
+      when:
+        - "prerun_services is not search anycast_leader_service"
+  serial:
+    - 1
+    - 50%
+    - 100%
+  tags: prod
+
+- name: setup logging
+  gather_facts: true
+  hosts:
+    - infra_service_haproxy_anycast
+  become: true
+  tags: logs
+  vars:
+    fbeats_haproxy_extended_logging: true
+    logrotate_filename: "haproxy"
+    logrotate_task_list:
+      - log_file_mask: "/var/log/haproxy/*.log"
+        nocreate: true
+        copytruncate: true
+        notifempty: true
+        compress: true
+        missingok: true
+        delaycompress: true
+  roles:
+    - logrotate_role
+    - filebeats_role
+  strategy: free

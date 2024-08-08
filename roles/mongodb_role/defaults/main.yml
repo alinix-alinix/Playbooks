@@ -1,0 +1,37 @@
+---
+mongodb_repository: "https://store.host.local/MongoDB"
+mongodb_version: "4.2.21"
+mongodb_files:
+  - "mongodb-org-shell-{{ mongodb_version }}"
+  - "mongodb-org-tools-{{ mongodb_version }}"
+  - "mongodb-org-mongos-{{ mongodb_version }}"
+  - "mongodb-org-server-{{ mongodb_version }}"
+mongodb_listen_address: "0.0.0.0"
+mongodb_listen_port: "27017"
+mongodb_logs_path: "/var/log/mongodb/mongod.log"
+mongodb_cache_size: 0.5
+mongodb_setup_replica_set: false
+pymongo_version: "3.12.3"
+
+mongodb_username: "{{ _mongodb_username[ansible_os_family] }}"
+_mongodb_username:
+  Debian: mongodb
+  RedHat: mongod
+mongodb_database_path: "{{ _mongodb_database_path[ansible_os_family] }}"
+_mongodb_database_path:
+  Debian: "/var/lib/mongodb"
+  RedHat: "/var/lib/mongo"
+mongodb_python_package: "{{ _mongodb_python_package[ansible_os_family] }}"
+_mongodb_python_package:
+  Debian: "/usr/bin/python3"
+  RedHat: "/usr/bin/python"
+mongodb_pymongo_package: "{{ _mongodb_pymongo_package[ansible_os_family] }}"
+_mongodb_pymongo_package:
+  Debian: "python3-pymongo"
+  RedHat: "python-pymongo"
+
+mongodb_exporter_version: "0.40.0"
+mognodb_exporter_repo:
+  "https://github.com/percona/mongodb_exporter/releases/download/v{{ mongodb_exporter_version }}/mongodb_exporter-{{ mongodb_exporter_version }}.linux-64-bit"
+mongodb_exporter_user: "mongodb_exporter"
+mongodb_exporter_listen_port: "9216"

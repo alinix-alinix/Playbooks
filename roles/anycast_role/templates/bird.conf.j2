@@ -36,7 +36,7 @@ protocol ospf myOSPF {
     import none;
     export filter export_OSPF;
 {% if anycast_ospf_area_auto %}   
-    area 98.0.{{ (inventory_hostname | regex_search('\d{1}')) }}.1 {  # this is used to determine area id, according to a DC encoded in hostname, for example: stg-dev-pql301. First digit is a DC number
+    area 98.0.{{ (inventory_hostname | regex_search('\d{1}')) }}.1 {
 {% else %}
     area {{ anycast_ospf_area_manual }} {
 {% endif %} 

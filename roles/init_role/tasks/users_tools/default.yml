@@ -1,0 +1,30 @@
+---
+- name: copy bashrc for {{ item }}
+  template:
+    src: "users_tools/{{ item }}/bashrc.j2"
+    dest: /home/{{ item }}/.bashrc
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: 0640
+  tags:
+    - tools
+
+- name: copy gitconfig for {{ item }}
+  template:
+    src: "users_tools/{{ item }}/.gitconfig"
+    dest: "/home/{{ item }}/.gitconfig"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: 0640
+  tags:
+    - tools
+
+- name: copy tmux for {{ item }}
+  template:
+    src: "users_tools/{{ item }}/tmux.conf.j2"
+    dest: "/home/{{ item }}/.tmux.conf"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: 0640
+  tags:
+    - tools

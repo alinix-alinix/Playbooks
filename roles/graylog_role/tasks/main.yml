@@ -1,0 +1,101 @@
+---
+- name: getting facts
+  include_tasks: get-facts-variables.yml
+
+- name: "java deployment"
+  include_role:
+    name: java-role
+
+- name: "graylog for centos"
+  block:
+    - name: "graylog repo"
+      yum:
+        name: "{{ graylog_repository_centos }}"
+        state: present
+
+    - name: "graylog apps"
+      yum:
+        name: "{{ item }}-{{ graylog_package_version }}"
+        state: present
+      loop: "{{ graylog_packages }}"
+  when:
+    - ansible_facts.os_family == "RedHat"
+
+- name: "graylog for debian"
+  block:
+    - name: "graylog repo"
+      apt:
+        deb: "{{ graylog_repository_debian }}"
+        state: present
+
+    - name: "graylog apps"
+      apt:
+        name: "{{ item }}={{ graylog_package_version }}"
+        state: present
+        update_cache: true
+      loop:
+        - "{{ graylog_packages }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+
+- name: look for graylog unit file in /etc/systemd/system
+  stat:
+    path: /etc/systemd/system/graylog-server.service
+  register: unit_existance
+
+- name: copy graylog systemd unit to /etc folder if it's absent there
+  copy:
+    src: /usr/lib/systemd/system/graylog-server.service
+    dest: /etc/systemd/system/graylog-server.service
+    mode: 0644
+    remote_src: true
+  notify: graylog restart
+  when: not unit_existance.stat.exists
+
+- name: graylog environment
+  file:
+    path: /etc/sysconfig
+    state: directory
+    mode: 0755
+
+- name: graylog jvm options
+  template:
+    src: jvm-options.j2
+    dest: /etc/sysconfig/graylog-server
+    mode: 0644
+  notify: graylog restart
+
+- name: graylog firewall port
+  vars:
+    firewalld_ports:
+      - '9000/tcp'
+  include_role:
+    name: firewalld_role
+
+- name: additional graylog firewall graylog_ports
+  vars:
+    firewalld_ports: "{{ graylog_input_ports }}"
+  include_role:
+    name: firewalld_role
+  when:
+    - graylog_input_ports is defined
+    - graylog_input_ports | length > 0
+
+- name: graylog prometheus monitoring plugin
+  get_url:
+    url: "https://store.local/G/graylog/metrics-reporter-prometheus-3.0.0.jar"
+    dest: "/usr/share/graylog-server/plugin/metrics-reporter-prometheus-3.0.0.jar"
+    mode: 0644
+
+- name: graylog configs
+  template:
+    src: graylog-server.conf
+    dest: /etc/graylog/server/server.conf
+    mode: 0644
+  notify: graylog restart
+
+- name: graylog service start
+  systemd:
+    name: graylog-server
+    state: started
+    enabled: true

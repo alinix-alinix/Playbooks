@@ -1,0 +1,8 @@
+{{ ansible_managed | comment }}
+# {{ git_repo.url }}
+# admin {{ git_repo.admin }} bus {{ git_repo.bus }}
+# Full list of options you can see https://github.com/percona/mongodb_exporter
+
+OPTIONS="--mongodb.uri=127.0.0.1:27017 \
+         --web.listen-address=:9216 \
+         --collector.diagnosticdata"
