@@ -3,6 +3,12 @@
   set_fact:
     java_opts: "{{ java_opts_default + java_opts_additional }}"
 
+- name: setting tomcat_memcached_session managers version variables in case of tomcat 8
+  set_fact:
+    tomcat_memcached_session_manager_tc_version: "tc8-1.8.3"
+    tomcat_memcached_session_manager_version: "1.8.3"
+  when: tomcat_version is regex ('^8.*')
+
 - name: prep tomcat env group
   group:
     name: "{{ tomcat_group }}"
@@ -57,6 +63,7 @@
     dest: "/opt/apache-tomcat-{{ tomcat_version }}/lib/{{ item }}"
     owner: "{{ tomcat_user }}"
     group: "{{ tomcat_group }}"
+    mode: 0644
   loop:
     - "memcached-session-manager-{{ tomcat_memcached_session_manager_tc_version }}.jar"
     - "memcached-session-manager-{{ tomcat_memcached_session_manager_version }}.jar"
@@ -126,9 +133,8 @@
     dest: "/opt/apache-tomcat-{{ tomcat_version }}/bin/jmx_prometheus_javaagent-{{ tomcat_jmx_exporter_version }}.jar"
     owner: "{{ tomcat_user }}"
     group: "{{ tomcat_group }}"
-  when:
-    - redeploy
-    - not ansible_check_mode
+    mode: 0664
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: jmx-monitoring-conf-file
   template:
