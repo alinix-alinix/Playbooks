@@ -23,6 +23,13 @@ Environment="CATALINA_PID=/opt/apache-tomcat-{{ tomcat_version }}/tomcat.pid"
 Environment="CATALINA_HOME=/opt/apache-tomcat-{{ tomcat_version }}"
 Environment="CATALINA_BASE=/opt/apache-tomcat-{{ tomcat_version }}"
 {% endif %}
+
+{% if tomcat_webapp_config is defined and tomcat_webapp_config | length > 0 %}
+# https://jira.petcorp.ru/browse/OPS-4025
+# Variable which determine where webapps is looking for config
+Environment="WEBAPP_CONFIG={{ tomcat_webapp_config }}"
+
+{% endif %}
 Environment="JAVA_OPTS= \
 -server \
 {% if tomcat_debug_option %}
