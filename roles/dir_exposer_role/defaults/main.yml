@@ -1,0 +1,11 @@
+---
+dir_exposer_python_ver: "3"
+dir_exposer_python_exec: "/usr/bin/python{{ dir_exposer_python_ver }}"
+dir_exposer_work_dir: "/opt/dir_exposer"
+dir_exposer_script_path: "{{ dir_exposer_work_dir }}/dir_exposer.py"
+dir_exposer_username: "reader"
+dir_exposer_password: "reader"
+dir_exposer_os_user: "dir_exposer"
+dir_exposer_os_groups:
+  - "{{ dir_exposer_os_user }}"
+dir_exposer_listen_port: "8008"
