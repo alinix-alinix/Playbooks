@@ -1,0 +1,14 @@
+[Unit]
+Description=Python Web Server with Basic Auth
+After=network.target
+
+[Service]
+ExecStart={{ dir_exposer_python_exec }} {{ dir_exposer_script_path }}
+WorkingDirectory={{ dir_exposer_work_dir }}
+Restart=always
+User={{ dir_exposer_os_user }}
+Group={{ dir_exposer_os_user }}
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
