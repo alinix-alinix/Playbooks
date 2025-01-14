@@ -1,0 +1,51 @@
+---
+- name: creating dir_exposer group
+  group:
+    name: "{{ item }}"
+    state: present
+  loop:
+    "{{ dir_exposer_os_groups }}"
+
+- name: creating dir_exposer user
+  user:
+    name: "{{ dir_exposer_os_user }}"
+    groups: "{{ dir_exposer_os_groups }}"
+    shell: /bin/false
+
+- name: prep exposer work folder
+  file:
+    path: "{{ dir_exposer_work_dir }}"
+    state: directory
+    mode: 0755
+    owner: "{{ dir_exposer_os_user }}"
+    group: "{{ dir_exposer_os_user }}"
+
+- name: templating exposer script
+  template:
+    src: "dir_exposer_python{{ dir_exposer_python_ver }}.py"
+    dest: "{{ dir_exposer_script_path }}"
+    owner: "{{ dir_exposer_os_user }}"
+    group: "{{ dir_exposer_os_user }}"
+    mode: 0644
+  notify: restart exposer
+
+- name: templating exposer unit
+  template:
+    src: "dir_exposer.service.j2"
+    dest: "/etc/systemd/system/dir_exposer.service"
+    mode: 0644
+  notify: restart exposer
+
+- name: staring and enabling exposer unit
+  systemd:
+    name: "dir_exposer.service"
+    enabled: true
+    state: "started"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "firewall-ports"
+  vars:
+    firewalld_ports:
+      - "{{ dir_exposer_listen_port }}/tcp"
+  include_role:
+    name: firewalld_role
