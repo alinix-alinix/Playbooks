@@ -72,7 +72,7 @@
     <!-- NOT USED -->
 {% endif %}
 
-    <Engine name="Catalina" defaultHost="localhost"{% if tomcat_ajp_jvm_route | length >0 %} jvmRoute="{{ tomcat_ajp_jvm_route }}"{% endif %}>
+    <Engine name="Catalina" defaultHost="localhost"{% if tomcat_jvm_route | length >0 %} jvmRoute="{{ tomcat_jvm_route }}"{% endif %}>
 
       <valve className="org.apache.catalina.valves.RemoteIpValve"
                 requestAttributesEnabled="true"
