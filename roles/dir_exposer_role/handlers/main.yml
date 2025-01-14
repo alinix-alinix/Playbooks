@@ -1,0 +1,7 @@
+---
+- name: restart exposer
+  systemd:
+    name: dir_exposer
+    daemon-reload: true
+    state: restarted
+  ignore_errors: "{{ ansible_check_mode }}"
