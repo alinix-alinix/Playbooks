@@ -1,0 +1,96 @@
+---
+- name: deploy tomcat nodes with optional cluster creates (hosts file modify)
+  gather_facts: true
+  hosts:
+    - tomcat_hosts
+  become: true
+  pre_tasks:
+    - name: Lookup token for access to vault
+      set_fact:
+        vault_access_token: "{{ lookup('env', 'VAULT_TOKEN_PERSONAL') }}"
+      tags:
+        - always
+    - name: Fail if token not defined
+      fail:
+        msg: 'This playbook uses hashicorp vault lookup.
+          Please specify environment variable $VAULT_TOKEN_PERSONAL, see link for more info
+          https://www.vaultproject.io/docs/commands/token/lookup'
+      when: vault_access_token | length == 0
+      tags:
+        - always
+  roles:
+    - role: init_role
+      tags: init_role
+
+    - role: tomcat_role
+      tags: tomcat_role
+      vars:
+        install_java: true
+        java_version: "8u60"
+        tomcat_version: "8.0.26"
+        tomcat_instance_name: "tomcat"
+        tomcat_user: "tomcat"
+        tomcat_group: "tomcat"
+        #  tomcat_dynamic_memory: true
+        #  tomcat_dynamic_memory_offheap: 4  # под 18гб xmx прода на ноде с 24гб
+        #  чтобы было под рукой:
+        #  tomcat_dynamic_memory: false
+        #  tomcat_xms_mem: 256m  # если флаг динамической памяти false,
+        #  tomcat_xmx_mem: 18g   # указываем ручками xms и xmx
+        tomcat_jmx_user: "admin"
+        tomcat_jmx_password: "{{ lookup('hashi_vault', 'secret=infra/data/java/tomcat/jmx/users/{}
+                  mount_point=secrets token={} url=https://vault.host.ru/'.format(tomcat_jmx_user,vault_access_token)).password }}"
+        tomcat_management_app_username: "admin"
+        tomcat_management_app_password: "{{ lookup('hashi_vault', 'secret=infra/data/java/tomcat/manager_app/users/{}
+                  mount_point=secrets token={} url=https://vault.host.ru/'.format(tomcat_management_app_username,vault_access_token)).password }}"
+        tomcat_sysctl_vars:
+          - param: 'fs.inotify.max_user_watches'
+            value: '16384'
+          - param: 'fs.inotify.max_user_instances'
+            value: '256'
+          - param: 'net.ipv4.ip_local_port_range'
+            value: '15000 61000'
+          - param: 'fs.file-max'
+            value: '30000'
+          - param: 'net.ipv6.conf.all.disable_ipv6'
+            value: '1'
+          - param: 'net.ipv6.conf.default.disable_ipv6'
+            value: '1'
+
+    - role: logrotate_role
+      vars:
+        tomcat_version: "8.0.26"
+        logrotate_retention_days: 10
+        logrotate_period: "hourly"
+        logrotate_filename: "tomcat"
+        logrotate_task_list:
+          - log_file_mask: "/var/log/tomcat{{ tomcat_version }}/*[!.][!g][!.z] /var/log/tomcat{{ tomcat_version }}/*/*[!.][!g][!.z]"
+            switch_user: tomcat
+            nocreate: true
+            copytruncate: true
+            notifempty: true
+            compress: true
+            missingok: true
+            postrotate: true
+            postrotate_script: >-
+              find /var/log/tomcat{{ tomcat_version }}/ \( -name \*.log -o -name \*.gz -o -name \*.txt \)
+              -mtime +{{ logrotate_retention_days }} -type "f" -exec rm -rfv {} \;
+
+    - role: dir_exposer_role  # default password is: https://vault.host.ru/ui/vault/secrets/infra/show/java/tomcat/logs/other-test/log-reader
+      tags: dir_exposer
+      vars:
+        dir_exposer_username: "log-reader"
+        dir_exposer_password: "{{ lookup('hashi_vault', 'secret=infra/data/java/tomcat/logs/other-test/{}
+                  mount_point=secrets token={} url=https://vault.host.ru/'.format(dir_exposer_username,vault_access_token)).password }}"
+        dir_exposer_dir_to_expose: "/opt/tomcat/logs"
+
+  tasks:
+    - name: create folder fileupload
+      file:
+        path: /opt/tomcat/webapps/fileupload
+        state: directory
+        mode: 0775
+        owner: tomcat
+        group: tomcat
+      ignore_errors: "{{ ansible_check_mode }}"
+
